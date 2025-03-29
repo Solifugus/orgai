@@ -1,0 +1,34 @@
+# AI Assistant Configuration
+
+# Policy Documents
+policy_documents:
+  source: "https://pstat-live-media.s3.amazonaws.com/read_only_reports/5f2a57c1-6f95-452e-b35b-6cdd057a2253/search_index.json"
+  update_frequency: "daily"  # Options: daily, weekly, manual
+  last_update: null  # Will be populated by the application
+
+# SQL Server Configuration
+sql_server:
+  connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=server_name;UID=username;PWD=password"
+  databases:
+    - name: "CoreDB"
+      description: "Core operational database"
+    - name: "ReportingDB"
+      description: "Reporting and analytics database"
+    - name: "AnalyticsDB"
+      description: "Business analytics and reporting"
+  excluded_schemas: ["sys", "INFORMATION_SCHEMA", "guest"]  # System schemas to exclude
+
+# Additional Documentation
+documentation:
+  indexables_dir: "indexables/"
+  file_types: [".md", ".txt", ".pdf"]
+  excluded_dirs: ["node_modules", ".git"]
+  update_frequency: "daily"  # Options: daily, weekly, manual
+  last_update: null  # Will be populated by the application
+
+# LLM Configuration
+llm:
+  model: "qwen2.5-coder:latest"
+  max_context_length: 4096
+  temperature: 0.7
+  top_p: 0.9 
