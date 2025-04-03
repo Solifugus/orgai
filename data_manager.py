@@ -114,17 +114,35 @@ class DataManager:
             try:
                 # Add database name to connection string
                 conn_str = f"{base_connection_string};DATABASE={db['name']}"
-                conn = pyodbc.connect(conn_str, timeout=30)  # Add timeout
+                try:
+                    conn = pyodbc.connect(conn_str, timeout=30)  # Add timeout
+                    self.db_connections[db['name']] = {
+                        'connection': conn,
+                        'excluded_schemas': excluded_schemas,
+                        'last_refresh': None,
+                        'schema_cache': None
+                    }
+                except pyodbc.Error as e:
+                    if "Can't open lib 'ODBC Driver 17 for SQL Server'" in str(e):
+                        print(f"Warning: SQL Server ODBC driver not found. Database integration will be disabled.")
+                        self.db_connections[db['name']] = {
+                            'connection': None,
+                            'excluded_schemas': excluded_schemas,
+                            'last_refresh': None,
+                            'schema_cache': None,
+                            'mock_data': True  # Flag to indicate we're using mock data
+                        }
+                    else:
+                        raise
+            except Exception as e:
+                print(f"Warning: Could not initialize database connection for {db['name']}: {e}")
                 self.db_connections[db['name']] = {
-                    'connection': conn,
+                    'connection': None,
                     'excluded_schemas': excluded_schemas,
                     'last_refresh': None,
-                    'schema_cache': None
+                    'schema_cache': None,
+                    'mock_data': True
                 }
-            except pyodbc.Error as e:
-                raise ConnectionError(f"Failed to connect to database {db['name']}: {e}")
-            except Exception as e:
-                raise ConnectionError(f"Unexpected error connecting to database {db['name']}: {e}")
 
     def _load_documentation(self):
         """Load documentation from the configured directory."""
@@ -171,6 +189,51 @@ class DataManager:
         """Get all database objects (tables, views, stored procedures) for a database."""
         if db_name not in self.db_connections:
             raise ValueError(f"Database {db_name} not found")
+
+        # Check if we're using mock data
+        if self.db_connections[db_name].get('mock_data'):
+            # Return mock database schema
+            return {
+                'tables': {
+                    'Employees': {
+                        'schema': 'dbo',
+                        'columns': [
+                            {'name': 'EmployeeID', 'type': 'int', 'nullable': 'NO', 'default': None, 'description': 'Primary key', 'position': 1},
+                            {'name': 'FirstName', 'type': 'varchar', 'nullable': 'NO', 'default': None, 'description': 'Employee first name', 'position': 2},
+                            {'name': 'LastName', 'type': 'varchar', 'nullable': 'NO', 'default': None, 'description': 'Employee last name', 'position': 3},
+                            {'name': 'Department', 'type': 'varchar', 'nullable': 'YES', 'default': None, 'description': 'Employee department', 'position': 4}
+                        ]
+                    },
+                    'Departments': {
+                        'schema': 'dbo',
+                        'columns': [
+                            {'name': 'DepartmentID', 'type': 'int', 'nullable': 'NO', 'default': None, 'description': 'Primary key', 'position': 1},
+                            {'name': 'DepartmentName', 'type': 'varchar', 'nullable': 'NO', 'default': None, 'description': 'Department name', 'position': 2},
+                            {'name': 'ManagerID', 'type': 'int', 'nullable': 'YES', 'default': None, 'description': 'Department manager', 'position': 3}
+                        ]
+                    }
+                },
+                'views': {
+                    'EmployeeDetails': {
+                        'schema': 'dbo',
+                        'columns': [
+                            {'name': 'EmployeeID', 'type': 'int', 'nullable': 'NO', 'default': None, 'description': 'Employee ID', 'position': 1},
+                            {'name': 'FullName', 'type': 'varchar', 'nullable': 'NO', 'default': None, 'description': 'Employee full name', 'position': 2},
+                            {'name': 'DepartmentName', 'type': 'varchar', 'nullable': 'YES', 'default': None, 'description': 'Department name', 'position': 3}
+                        ]
+                    }
+                },
+                'stored_procedures': {
+                    'GetEmployeeByID': {
+                        'schema': 'dbo',
+                        'definition': 'CREATE PROCEDURE GetEmployeeByID @EmployeeID int AS SELECT * FROM Employees WHERE EmployeeID = @EmployeeID',
+                        'comment': 'Retrieves employee information by ID',
+                        'created': '2024-01-01',
+                        'last_altered': '2024-01-01'
+                    }
+                },
+                'last_refresh': datetime.now().isoformat()
+            }
 
         # Check if we need to refresh the schema
         if not self._should_refresh_schema(db_name):

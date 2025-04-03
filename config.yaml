@@ -9,8 +9,8 @@ policy_documents:
 
 # SQL Server Configuration
 sql_server:
-  enabled: false  # Set to false to disable database integration
-  connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=server_name;UID=username;PWD=password"
+  enabled: true  # Enable database integration for testing
+  connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;UID=test;PWD=test"
   databases:
     - name: "CoreDB"
       description: "Core operational database"
