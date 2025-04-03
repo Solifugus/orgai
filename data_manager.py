@@ -60,15 +60,28 @@ class DataManager:
     async def _load_policy_documents(self):
         """Load policy documents from the configured source."""
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(self.config['policy_documents']['source'])
-                if response.status_code == 200:
-                    self.policy_docs = response.json()
-                    self.config['policy_documents']['last_update'] = datetime.now().isoformat()
-                else:
-                    raise ConnectionError(f"Failed to load policy documents: HTTP {response.status_code}")
+            source = self.config['policy_documents']['source']
+            
+            # Check if source is a URL or local file
+            if source.startswith(('http://', 'https://')):
+                async with httpx.AsyncClient() as client:
+                    response = await client.get(source)
+                    if response.status_code == 200:
+                        self.policy_docs = response.json()
+                    else:
+                        raise ConnectionError(f"Failed to load policy documents: HTTP {response.status_code}")
+            else:
+                # Load from local file
+                if not os.path.exists(source):
+                    raise FileNotFoundError(f"Policy documents file not found: {source}")
+                with open(source, 'r') as f:
+                    self.policy_docs = json.load(f)
+            
+            self.config['policy_documents']['last_update'] = datetime.now().isoformat()
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error loading policy documents: {e}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON in policy documents: {e}")
         except Exception as e:
             raise ConnectionError(f"Error loading policy documents: {e}")
 
