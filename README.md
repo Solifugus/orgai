@@ -162,4 +162,95 @@ Once the server is running, you can access the API documentation at:
    - Check database connectivity
    - Verify SQL Server permissions
    - Check generated files in public/docs/
-   - Review error messages in console output 
+   - Review error messages in console output
+
+# OrgAI Setup Instructions
+
+## Local Development (Linux)
+
+### 1. Virtual Environment Setup
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 2. SQL Server Integration
+The application supports both real SQL Server connections and mock data fallback:
+
+#### With SQL Server (Work Environment)
+```bash
+# Add Microsoft repository
+curl https://packages.microsoft.com/keys/microsoft.asc | sudo apt-key add -
+curl https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+
+# Update and install
+sudo apt-get update
+sudo ACCEPT_EULA=Y apt-get install -y msodbcsql18
+```
+
+#### Without SQL Server (Local Development)
+The application will automatically use mock data when the ODBC driver is not available.
+
+### 3. Configuration
+Update `config.yaml` with appropriate settings:
+
+```yaml
+sql_server:
+  enabled: true
+  # For work environment
+  connection_string: "DRIVER={ODBC Driver 18 for SQL Server};SERVER=your_work_server;DATABASE=CoreDB;UID=your_username;PWD=your_password"
+  # For local development (mock data)
+  # connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;UID=test;PWD=test"
+```
+
+### 4. Running the Application
+```bash
+# Start the server
+uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+
+# If port is in use, kill existing process first
+pkill -f "uvicorn server:app"
+```
+
+## Features
+
+### SQL Server Integration
+- Automatically detects SQL Server ODBC driver availability
+- Falls back to mock data when driver is not available
+- Supports multiple databases (CoreDB, ReportingDB, AnalyticsDB)
+- Caches database schema for improved performance
+
+### Policy Documents
+- Fetches policy documents from remote URL
+- Caches documents locally
+- Updates daily or as configured
+
+### Local Documentation
+- Supports local documentation integration
+- Configurable through config.yaml
+
+## Troubleshooting
+
+### Port Already in Use
+If you see the error `[Errno 98] Address already in use`:
+```bash
+# Kill existing server process
+pkill -f "uvicorn server:app"
+```
+
+### SQL Server Connection Issues
+- Verify ODBC driver installation
+- Check connection string in config.yaml
+- Ensure database server is accessible
+- Application will fall back to mock data if connection fails
+
+### Policy Documents
+- Check internet connectivity for remote URL access
+- Verify local cache directory permissions
+- Monitor update frequency in config.yaml 
