@@ -39,19 +39,21 @@ class DataManager:
 
     async def _initialize_data_sources(self):
         """Initialize all data sources based on configuration."""
-        if self.config.get('policy_documents', {}).get('enabled', True):
+        policy_config = self.config.get('policy_documents', {})
+        enabled = policy_config.get('enabled')
+        if enabled in (True, 'true', 'True', '1'):  # More flexible check
             await self._load_policy_documents()
         else:
             print("Policy documents integration disabled")
             self.policy_docs = {}
 
-        if self.config.get('sql_server', {}).get('enabled', True):
+        if self.config.get('sql_server', {}).get('enabled') is True:
             self._initialize_database_connections()
         else:
             print("Database integration disabled")
             self.db_connections = {}
 
-        if self.config.get('documentation', {}).get('enabled', True):
+        if self.config.get('documentation', {}).get('enabled') is True:
             self._load_documentation()
         else:
             print("Local documentation integration disabled")
@@ -61,6 +63,11 @@ class DataManager:
         """Load policy documents from the configured source."""
         try:
             source = self.config['policy_documents']['source']
+            
+            # Convert to absolute path if it's a local file
+            if not source.startswith(('http://', 'https://')):
+                source = os.path.abspath(source)
+                print(f"Loading policy documents from: {source}")  # Debug log
             
             # Check if source is a URL or local file
             if source.startswith(('http://', 'https://')):
@@ -76,6 +83,7 @@ class DataManager:
                     raise FileNotFoundError(f"Policy documents file not found: {source}")
                 with open(source, 'r') as f:
                     self.policy_docs = json.load(f)
+                print(f"Successfully loaded {len(self.policy_docs)} policy documents")  # Debug log
             
             self.config['policy_documents']['last_update'] = datetime.now().isoformat()
         except httpx.RequestError as e:
