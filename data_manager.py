@@ -28,7 +28,6 @@ class DataManager:
         self.policy_docs = {}
         self.db_connections = {}
         self.documentation = {}
-        self._initialize_data_sources()
 
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from YAML file."""
@@ -40,9 +39,23 @@ class DataManager:
 
     async def _initialize_data_sources(self):
         """Initialize all data sources based on configuration."""
-        await self._load_policy_documents()
-        self._initialize_database_connections()
-        self._load_documentation()
+        if self.config.get('policy_documents', {}).get('enabled', True):
+            await self._load_policy_documents()
+        else:
+            print("Policy documents integration disabled")
+            self.policy_docs = {}
+
+        if self.config.get('sql_server', {}).get('enabled', True):
+            self._initialize_database_connections()
+        else:
+            print("Database integration disabled")
+            self.db_connections = {}
+
+        if self.config.get('documentation', {}).get('enabled', True):
+            self._load_documentation()
+        else:
+            print("Local documentation integration disabled")
+            self.documentation = {}
 
     async def _load_policy_documents(self):
         """Load policy documents from the configured source."""
@@ -237,6 +250,9 @@ class DataManager:
 
     def search_policy_documents(self, query: str) -> List[Dict]:
         """Search policy documents for relevant information."""
+        if not self.config.get('policy_documents', {}).get('enabled', True):
+            return []
+            
         results = []
         query_terms = query.lower().split()
         
@@ -287,7 +303,10 @@ class DataManager:
         return results
 
     def search_documentation(self, query: str) -> List[Dict]:
-        """Search documentation for relevant information."""
+        """Search local documentation for relevant information."""
+        if not self.config.get('documentation', {}).get('enabled', True):
+            return []
+            
         results = []
         query_terms = query.lower().split()
         
@@ -328,6 +347,9 @@ class DataManager:
 
     def get_relevant_database_info(self, query: str) -> List[Dict]:
         """Get relevant database information based on the query."""
+        if not self.config.get('sql_server', {}).get('enabled', True):
+            return []
+            
         results = []
         query_terms = query.lower().split()
         

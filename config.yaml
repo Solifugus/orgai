@@ -2,12 +2,14 @@
 
 # Policy Documents
 policy_documents:
+  enabled: false  # Set to false to disable policy document integration
   source: "https://pstat-live-media.s3.amazonaws.com/read_only_reports/5f2a57c1-6f95-452e-b35b-6cdd057a2253/search_index.json"
   update_frequency: "daily"  # Options: daily, weekly, manual
   last_update: null  # Will be populated by the application
 
 # SQL Server Configuration
 sql_server:
+  enabled: false  # Set to false to disable database integration
   connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=server_name;UID=username;PWD=password"
   databases:
     - name: "CoreDB"
@@ -20,6 +22,7 @@ sql_server:
 
 # Additional Documentation
 documentation:
+  enabled: false  # Set to false to disable local documentation integration
   indexables_dir: "indexables/"
   file_types: [".md", ".txt", ".pdf"]
   excluded_dirs: ["node_modules", ".git"]
