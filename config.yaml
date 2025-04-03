@@ -3,7 +3,7 @@
 # Policy Documents
 policy_documents:
   enabled: true  # Enable policy document integration
-  source: "policies.json"  # Use local file instead of remote URL
+  source: "https://pstat-live-media.s3.amazonaws.com/read_only_reports/5f2a57c1-6f95-452e-b35b-6cdd057a2253/search_index.json"  # Remote source with local caching
   update_frequency: "daily"  # Options: daily, weekly, manual
   last_update: null  # Will be populated by the application
 

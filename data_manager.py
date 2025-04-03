@@ -60,32 +60,44 @@ class DataManager:
             self.documentation = {}
 
     async def _load_policy_documents(self):
-        """Load policy documents from the configured source."""
+        """Load policy documents from the configured source with daily caching."""
         try:
             source = self.config['policy_documents']['source']
+            last_update = self.config['policy_documents'].get('last_update')
             
-            # Convert to absolute path if it's a local file
-            if not source.startswith(('http://', 'https://')):
-                source = os.path.abspath(source)
-                print(f"Loading policy documents from: {source}")  # Debug log
-            
-            # Check if source is a URL or local file
+            # Check if we need to update from URL
+            should_update = False
             if source.startswith(('http://', 'https://')):
+                if not last_update:
+                    should_update = True
+                else:
+                    last_update_time = datetime.fromisoformat(last_update)
+                    time_since_update = datetime.now() - last_update_time
+                    if time_since_update.days >= 1:
+                        should_update = True
+            
+            if should_update:
+                print(f"Updating policy documents from URL: {source}")
                 async with httpx.AsyncClient() as client:
                     response = await client.get(source)
                     if response.status_code == 200:
                         self.policy_docs = response.json()
+                        # Save to local file
+                        with open('policies.json', 'w') as f:
+                            json.dump(self.policy_docs, f)
+                        self.config['policy_documents']['last_update'] = datetime.now().isoformat()
+                        print(f"Successfully updated {len(self.policy_docs)} policy documents")
                     else:
                         raise ConnectionError(f"Failed to load policy documents: HTTP {response.status_code}")
             else:
                 # Load from local file
-                if not os.path.exists(source):
-                    raise FileNotFoundError(f"Policy documents file not found: {source}")
-                with open(source, 'r') as f:
+                local_file = 'policies.json'
+                if not os.path.exists(local_file):
+                    raise FileNotFoundError(f"Policy documents file not found: {local_file}")
+                with open(local_file, 'r') as f:
                     self.policy_docs = json.load(f)
-                print(f"Successfully loaded {len(self.policy_docs)} policy documents")  # Debug log
+                print(f"Using cached policy documents from {local_file} (last updated: {last_update})")
             
-            self.config['policy_documents']['last_update'] = datetime.now().isoformat()
         except httpx.RequestError as e:
             raise ConnectionError(f"Network error loading policy documents: {e}")
         except json.JSONDecodeError as e:
