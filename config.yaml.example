@@ -1,0 +1,41 @@
+# Example configuration file
+# Copy this file to config.yaml and modify the values as needed
+
+# Ollama configuration
+ollama:
+  model: llama2
+  host: http://localhost:11434
+  timeout: 300
+
+# Policy documents configuration
+policy_documents:
+  enabled: true
+  source: https://pstat-live-media.s3.amazonaws.com/read_only_reports/5f2a57c1-6f95-452e-b35b-6cdd057a2253/search_index.json
+  last_update: null  # Will be automatically updated
+
+# SQL Server configuration
+sql_server:
+  enabled: true
+  connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=your_server;UID=your_username;PWD=your_password;TrustServerCertificate=yes"
+  excluded_schemas:
+    - sys
+    - INFORMATION_SCHEMA
+  databases:
+    - name: CoreDB
+      description: "Core database containing main application data"
+    - name: ReportingDB
+      description: "Reporting and analytics database"
+
+# Documentation configuration
+documentation:
+  enabled: true
+  indexables_dir: "./docs"
+  file_types:
+    - .md
+    - .txt
+    - .rst
+  excluded_dirs:
+    - node_modules
+    - .git
+    - __pycache__
+  last_update: null  # Will be automatically updated 

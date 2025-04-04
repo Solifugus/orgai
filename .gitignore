@@ -22,8 +22,9 @@ wheels/
 
 # Virtual Environment
 venv/
-env/
 ENV/
+env/
+.env
 
 # IDE
 .idea/
@@ -31,13 +32,17 @@ ENV/
 *.swp
 *.swo
 
+# Logs
+*.log
+logs/
+/tmp/ai-assistant.log
+
+# Local configuration
+config.yaml
+
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-
 # Local development settings
-.env
 .env.local 
