@@ -17,6 +17,22 @@ policy_documents:
 sql_server:
   enabled: true
   connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=your_server;UID=your_username;PWD=your_password;TrustServerCertificate=yes"
+  # Enable or disable data retrieval via SQL query execution
+  allow_data_queries: false
+  # Maximum number of rows to return from SQL queries
+  max_rows: 100
+  # Timeout for SQL queries in seconds
+  query_timeout: 30
+  # Tables that are allowed to be queried directly (empty means all tables)
+  allowed_tables: []
+  # Tables that are not allowed to be queried directly
+  restricted_tables:
+    - Users
+    - Employees
+    - Credentials
+    - Passwords
+    - Accounts
+    - Authentication
   excluded_schemas:
     - sys
     - INFORMATION_SCHEMA

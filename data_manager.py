@@ -28,6 +28,180 @@ class DataManager:
         self.policy_docs = {}
         self.db_connections = {}
         self.documentation = {}
+        
+    def execute_sql_query(self, query: str, db_name: str = None) -> Tuple[List[Dict], str]:
+        """
+        Execute a SQL query and return the results and column information.
+        
+        Args:
+            query: The SQL query to execute
+            db_name: The database to query. If None, queries the first available database
+            
+        Returns:
+            Tuple containing:
+                - List of dictionaries representing rows
+                - Formatted table string for display
+        """
+        # Check if data queries are allowed in config
+        if not self.config.get('sql_server', {}).get('allow_data_queries', False):
+            raise PermissionError("Data queries are not enabled in the configuration")
+        
+        if not self.config.get('sql_server', {}).get('enabled', True):
+            raise ConnectionError("SQL Server integration is not enabled")
+        
+        # Get max rows and timeout from config
+        max_rows = self.config.get('sql_server', {}).get('max_rows', 100)
+        timeout = self.config.get('sql_server', {}).get('query_timeout', 30)
+        
+        # Basic SQL injection protection - this is not comprehensive
+        # and should be enhanced for production use
+        dangerous_operations = ['DROP', 'DELETE', 'TRUNCATE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE']
+        dangerous_techniques = ['--', ';', 'WAITFOR', 'DELAY', 'SHUTDOWN', 'UNION ALL', 'UNION SELECT']
+        
+        # Check for dangerous operations
+        query_upper = query.upper()
+        for operation in dangerous_operations:
+            if operation in query_upper:
+                raise PermissionError(f"Operation not allowed: {operation}")
+                
+        # Check for SQL injection techniques
+        for technique in dangerous_techniques:
+            if technique in query_upper:
+                raise PermissionError(f"Potential SQL injection detected: {technique}")
+        
+        # Check for unrestricted SELECT to limit to data retrieval only
+        if not query_upper.strip().startswith('SELECT'):
+            raise PermissionError("Only SELECT queries are allowed")
+            
+        # Enforce LIMIT/TOP to prevent returning too many rows
+        if "TOP" not in query_upper and "LIMIT" not in query_upper:
+            # Add TOP clause to prevent returning too many rows
+            if "SELECT " in query_upper:
+                query = query.replace("SELECT ", f"SELECT TOP {max_rows} ", 1)
+            else:
+                query = f"SELECT TOP {max_rows} " + query[7:]
+        
+        # Determine which database to use
+        if db_name is None:
+            # Use the first available database
+            for db in self.config['sql_server']['databases']:
+                db_name = db['name']
+                if db_name in self.db_connections and self.db_connections[db_name]['connection'] is not None:
+                    break
+        
+        if db_name not in self.db_connections:
+            raise ValueError(f"Database {db_name} not found")
+        
+        if self.db_connections[db_name].get('mock_data'):
+            # Return mock data for queries
+            return self._generate_mock_query_results(query)
+            
+        # Check for restricted tables
+        restricted_tables = self.config.get('sql_server', {}).get('restricted_tables', [])
+        for table in restricted_tables:
+            if f" {table} " in f" {query} " or f" {table}." in query:
+                raise PermissionError(f"Access to table {table} is restricted")
+                
+        # Check for allowed tables if specified
+        allowed_tables = self.config.get('sql_server', {}).get('allowed_tables', [])
+        if allowed_tables:
+            # If allowed_tables is specified but empty, all unrestricted tables are allowed
+            if len(allowed_tables) > 0:
+                # Check if query uses only allowed tables
+                is_allowed = False
+                for table in allowed_tables:
+                    if f" {table} " in f" {query} " or f" {table}." in query:
+                        is_allowed = True
+                        break
+                if not is_allowed:
+                    raise PermissionError("Query uses tables not in the allowed list")
+        
+        # Execute the query
+        try:
+            conn = self.db_connections[db_name]['connection']
+            cursor = conn.cursor()
+            
+            # Set query timeout
+            cursor.execute(f"SET QUERY_GOVERNOR_COST_LIMIT {timeout * 1000}")
+            
+            # Execute the query
+            cursor.execute(query)
+            
+            # Get column names
+            columns = [column[0] for column in cursor.description]
+            
+            # Fetch results
+            results = []
+            for row in cursor.fetchall():
+                results.append(dict(zip(columns, row)))
+                
+            # Create formatted table string
+            table_string = self._format_results_as_table(results, columns)
+            
+            return results, table_string
+            
+        except pyodbc.Error as e:
+            raise QueryError(f"Database query error: {e}")
+        except Exception as e:
+            raise QueryError(f"Unexpected error executing query: {e}")
+    
+    def _generate_mock_query_results(self, query: str) -> Tuple[List[Dict], str]:
+        """Generate mock results for SQL queries when database is not available."""
+        # Parse the query to determine what kind of data to mock
+        query_lower = query.lower()
+        
+        # Default mock data structure
+        columns = ["id", "name", "value", "created_at"]
+        mock_data = []
+        
+        # Generate 5-10 rows of mock data
+        import random
+        from datetime import datetime, timedelta
+        
+        row_count = random.randint(5, 10)
+        
+        for i in range(1, row_count + 1):
+            days_ago = random.randint(0, 365)
+            mock_date = (datetime.now() - timedelta(days=days_ago)).strftime("%Y-%m-%d")
+            mock_data.append({
+                "id": i,
+                "name": f"Sample Item {i}",
+                "value": random.randint(10, 1000),
+                "created_at": mock_date
+            })
+            
+        # Create formatted table string
+        table_string = self._format_results_as_table(mock_data, columns)
+        
+        return mock_data, table_string
+    
+    def _format_results_as_table(self, results: List[Dict], columns: List[str]) -> str:
+        """Format query results as a markdown table string."""
+        if not results:
+            return "No results found."
+            
+        # Calculate column widths
+        col_widths = {col: len(col) for col in columns}
+        for row in results:
+            for col in columns:
+                # Convert all values to strings and calculate max width
+                val = str(row.get(col, ""))
+                col_widths[col] = max(col_widths[col], len(val))
+                
+        # Create header row
+        header = "| " + " | ".join(col.ljust(col_widths[col]) for col in columns) + " |"
+        separator = "| " + " | ".join("-" * col_widths[col] for col in columns) + " |"
+        
+        # Create data rows
+        data_rows = []
+        for row in results:
+            data_row = "| " + " | ".join(str(row.get(col, "")).ljust(col_widths[col]) for col in columns) + " |"
+            data_rows.append(data_row)
+            
+        # Combine all rows
+        table = [header, separator] + data_rows
+        
+        return "\n".join(table)
 
     def _load_config(self, config_path: str) -> Dict:
         """Load configuration from YAML file."""
@@ -345,12 +519,31 @@ class DataManager:
             raise QueryError(f"Unexpected error processing database {db_name}: {e}")
 
     def search_policy_documents(self, query: str) -> List[Dict]:
-        """Search policy documents for relevant information."""
+        """
+        Search policy documents for relevant information.
+        Uses an improved matching algorithm with higher precision.
+        """
         if not self.config.get('policy_documents', {}).get('enabled', True):
             return []
             
         results = []
         query_terms = query.lower().split()
+        
+        # Prioritize important terms, filter out common words
+        important_terms = []
+        common_words = {"the", "a", "an", "and", "or", "but", "is", "are", "for", "of", "in", "on", "at", "to", "with", "by", "about"}
+        
+        for term in query_terms:
+            if len(term) > 2 and term not in common_words:
+                important_terms.append(term)
+        
+        # If we filtered out all terms, use original terms
+        if not important_terms and query_terms:
+            important_terms = query_terms
+        
+        # Extract key terms for better context matching
+        key_policy_terms = {"policy", "procedure", "guideline", "rule", "regulation", "standard", "vacation", "leave", "benefit"}
+        query_contains_policy_term = any(term in key_policy_terms for term in query_terms)
         
         for doc in self.policy_docs:
             # Get all relevant text fields for searching
@@ -362,23 +555,39 @@ class DataManager:
                 doc.get('text_preview', '')
             ]
             
-            # Calculate relevance scores for each field
-            name_score = max(self._similarity_ratio(term, doc.get('name', '').lower()) for term in query_terms)
-            category_score = max(self._similarity_ratio(term, doc.get('category_name', '').lower()) for term in query_terms)
-            author_score = max(self._similarity_ratio(term, doc.get('author_name', '').lower()) for term in query_terms)
-            group_score = max(self._similarity_ratio(term, doc.get('applicability_group_name', '').lower()) for term in query_terms)
-            preview_score = max(self._similarity_ratio(term, doc.get('text_preview', '').lower()) for term in query_terms)
+            # Calculate relevance scores for each field with higher precision
+            name_score = max(self._similarity_ratio(term, doc.get('name', '').lower()) for term in important_terms) if important_terms else 0
             
-            # Weighted scoring system
+            # Give exact matches a boost
+            if any(term in doc.get('name', '').lower() for term in important_terms):
+                name_score += 0.3
+                
+            category_score = max(self._similarity_ratio(term, doc.get('category_name', '').lower()) for term in important_terms) if important_terms else 0
+            author_score = max(self._similarity_ratio(term, doc.get('author_name', '').lower()) for term in important_terms) if important_terms else 0
+            group_score = max(self._similarity_ratio(term, doc.get('applicability_group_name', '').lower()) for term in important_terms) if important_terms else 0
+            
+            # For preview text, check each term and average the scores
+            preview_text = doc.get('text_preview', '').lower()
+            preview_scores = [self._similarity_ratio(term, preview_text) for term in important_terms] if important_terms else [0]
+            preview_score = sum(preview_scores) / len(preview_scores) if preview_scores else 0
+            
+            # Check for exact term matches in the preview
+            if any(term in preview_text for term in important_terms):
+                preview_score += 0.2
+            
+            # Improved weighted scoring system
             relevance_score = (
-                name_score * 0.4 +          # Policy name is most important
-                category_score * 0.2 +       # Category is second most important
-                preview_score * 0.2 +        # Preview text is third most important
-                group_score * 0.1 +          # Applicability group is less important
-                author_score * 0.1           # Author is least important
+                name_score * 0.45 +          # Policy name is most important
+                preview_score * 0.30 +        # Preview text is second most important
+                category_score * 0.15 +       # Category is third most important
+                group_score * 0.05 +          # Applicability group is less important
+                author_score * 0.05           # Author is least important
             )
             
-            if relevance_score > 0.3:  # Threshold for relevance
+            # Lower threshold for policy queries
+            threshold = 0.25 if query_contains_policy_term else 0.35
+            
+            if relevance_score > threshold:  # Dynamic threshold based on query type
                 results.append({
                     'name': doc.get('name'),
                     'id': doc.get('id'),
@@ -442,22 +651,60 @@ class DataManager:
         return results
 
     def get_relevant_database_info(self, query: str) -> List[Dict]:
-        """Get relevant database information based on the query."""
+        """
+        Get relevant database information based on the query.
+        Uses an improved matching algorithm with weighted scoring.
+        """
         if not self.config.get('sql_server', {}).get('enabled', True):
             return []
             
         results = []
         query_terms = query.lower().split()
         
+        # Prioritize important terms, filter out common words
+        important_terms = []
+        common_words = {"the", "a", "an", "and", "or", "but", "is", "are", "for", "of", "in", "on", "at", "to", "with", "by", "about"}
+        
+        for term in query_terms:
+            if len(term) > 2 and term not in common_words:
+                important_terms.append(term)
+        
+        # If we filtered out all terms, use original terms
+        if not important_terms and query_terms:
+            important_terms = query_terms
+        
+        # Extract key terms for better context matching
+        key_db_terms = {"table", "column", "field", "database", "schema", "view", "stored", "procedure", "data", "structure"}
+        query_contains_db_term = any(term in key_db_terms for term in query_terms)
+        
+        # Adjust threshold based on query specificity
+        base_threshold = 0.25 if query_contains_db_term else 0.35
+        exact_match_bonus = 0.3  # Bonus for exact matches
+            
         for db in self.config['sql_server']['databases']:
             db_name = db['name']
             try:
                 db_objects = self.get_database_objects(db_name)
                 
-                # Search through tables
+                # Check for database name match in query
+                db_name_score = max(self._similarity_ratio(term, db_name.lower()) for term in important_terms) if important_terms else 0
+                db_exact_match = any(term in db_name.lower() for term in important_terms)
+                
+                # Search through tables with improved scoring
                 for table_name, table_info in db_objects['tables'].items():
-                    table_score = max(self._similarity_ratio(term, table_name.lower()) for term in query_terms)
-                    if table_score > 0.3:  # Threshold for relevance
+                    # Calculate raw similarity score
+                    table_scores = [self._similarity_ratio(term, table_name.lower()) for term in important_terms]
+                    table_score = max(table_scores) if table_scores else 0
+                    
+                    # Add bonus for exact matches
+                    if any(term in table_name.lower() for term in important_terms):
+                        table_score += exact_match_bonus
+                    
+                    # Boost score if database name was also matched
+                    if db_exact_match:
+                        table_score += 0.1
+                    
+                    if table_score > base_threshold:
                         results.append({
                             'database': db_name,
                             'type': 'table',
@@ -467,10 +714,31 @@ class DataManager:
                             'relevance_score': table_score
                         })
                     
-                    # Search through columns
+                    # Search through columns with improved scoring
                     for column in table_info['columns']:
-                        col_score = max(self._similarity_ratio(term, column['name'].lower()) for term in query_terms)
-                        if col_score > 0.3:
+                        # Calculate raw similarity score for column name
+                        col_scores = [self._similarity_ratio(term, column['name'].lower()) for term in important_terms]
+                        col_score = max(col_scores) if col_scores else 0
+                        
+                        # Add bonus for exact matches
+                        if any(term in column['name'].lower() for term in important_terms):
+                            col_score += exact_match_bonus
+                            
+                        # Check for matches in column description if available
+                        if column.get('description'):
+                            desc_scores = [self._similarity_ratio(term, column['description'].lower()) for term in important_terms]
+                            desc_score = max(desc_scores) if desc_scores else 0
+                            
+                            if desc_score > col_score:  # If description match is better, use it
+                                col_score = desc_score
+                            elif desc_score > 0.3:  # If description match is good, boost the score
+                                col_score += 0.1
+                        
+                        # Add context from table match
+                        if table_score > base_threshold:
+                            col_score += 0.1
+                        
+                        if col_score > base_threshold:
                             results.append({
                                 'database': db_name,
                                 'type': 'column',
@@ -480,10 +748,24 @@ class DataManager:
                                 'relevance_score': col_score
                             })
 
-                # Search through views
+                # Search through views with improved scoring
                 for view_name, view_info in db_objects['views'].items():
-                    view_score = max(self._similarity_ratio(term, view_name.lower()) for term in query_terms)
-                    if view_score > 0.3:
+                    # Calculate raw similarity score
+                    view_scores = [self._similarity_ratio(term, view_name.lower()) for term in important_terms]
+                    view_score = max(view_scores) if view_scores else 0
+                    
+                    # Add bonus for exact matches
+                    if any(term in view_name.lower() for term in important_terms):
+                        view_score += exact_match_bonus
+                    
+                    # Boost score if database name was also matched
+                    if db_exact_match:
+                        view_score += 0.1
+                        
+                    # Slightly lower threshold for views (they're often more relevant for reporting queries)
+                    view_threshold = base_threshold - 0.05
+                    
+                    if view_score > view_threshold:
                         results.append({
                             'database': db_name,
                             'type': 'view',
@@ -493,16 +775,39 @@ class DataManager:
                             'relevance_score': view_score
                         })
 
-                # Search through stored procedures
+                # Search through stored procedures with improved scoring
                 for proc_name, proc_info in db_objects['stored_procedures'].items():
-                    proc_score = max(self._similarity_ratio(term, proc_name.lower()) for term in query_terms)
-                    if proc_score > 0.3:
+                    # Calculate raw similarity score
+                    proc_scores = [self._similarity_ratio(term, proc_name.lower()) for term in important_terms]
+                    proc_score = max(proc_scores) if proc_scores else 0
+                    
+                    # Add bonus for exact matches
+                    if any(term in proc_name.lower() for term in important_terms):
+                        proc_score += exact_match_bonus
+                    
+                    # Check for matches in procedure definition
+                    if proc_info.get('definition'):
+                        # Use a safe substring to prevent overly large searches
+                        def_text = proc_info['definition'][:500].lower()
+                        contains_term = any(term in def_text for term in important_terms)
+                        
+                        if contains_term:  # If definition contains any search term, boost score
+                            proc_score += 0.15
+                    
+                    # Boost score if database name was also matched
+                    if db_exact_match:
+                        proc_score += 0.1
+                    
+                    # Slightly lower threshold for stored procedures
+                    proc_threshold = base_threshold - 0.05
+                    
+                    if proc_score > proc_threshold:
                         results.append({
                             'database': db_name,
                             'type': 'stored_procedure',
                             'schema': proc_info['schema'],
                             'name': proc_name,
-                            'definition': proc_info['definition'],
+                            'definition': proc_info.get('definition', ''),
                             'relevance_score': proc_score
                         })
             except Exception as e:

@@ -4,11 +4,26 @@
 
 This AI Assistant is designed to provide intelligent responses to organizational queries by leveraging multiple data sources and maintaining context-aware conversations. The system integrates policy documents, organizational data, and technical documentation to provide comprehensive answers to user questions.
 
+## Deployment Environments
+
+The system is designed for flexible deployment:
+
+1. **Enterprise Environment**
+   - Linux server within organization network
+   - Direct connection to SQL Server database
+   - Full access to policy documents and organizational data
+   - Can be deployed with Conda or other environment managers
+
+2. **Development/Testing Environments**
+   - Compatible with various Linux distributions
+   - Python virtual environment (venv) support
+   - Mock data capabilities when database isn't available
+   - Local caching of policy documents
+
 ## Data Sources
 
 ### 1. Policy Documents
-- Source: PolicyStat API (JSON format)
-- URL: https://pstat-live-media.s3.amazonaws.com/read_only_reports/5f2a57c1-6f95-452e-b35b-6cdd057a2253/search_index.json
+- Source: Policy repository API (JSON format)
 - Content: Organizational policies, procedures, and guidelines
 - Update Frequency: As needed via API refresh
 
@@ -139,6 +154,25 @@ This AI Assistant is designed to provide intelligent responses to organizational
    - Context summarization
    - Multi-document context integration
 
+## Technical Implementation
+
+### Environment Management
+- Automatic detection of Python environment (Conda/venv)
+- Adapts paths and commands based on environment type
+- Environment-agnostic service management script
+
+### Database Integration
+- Uses pyodbc for SQL Server connectivity
+- Graceful fallback to mock data when database unavailable
+- Schema caching to reduce database load
+- Exclusion of system schemas to focus on relevant objects
+
+### Documentation Generation
+- HTML-based documentation for database objects
+- Cross-linked resources for navigation
+- Search functionality for quick reference
+- Automatic updates with schema changes
+
 ## Development Guidelines
 
 1. Code Organization
@@ -157,4 +191,3 @@ This AI Assistant is designed to provide intelligent responses to organizational
    - Environment configuration
    - Monitoring and logging
    - Health checks
-
