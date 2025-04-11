@@ -419,7 +419,7 @@ class DataManager:
         cursor = conn.cursor()
 
         try:
-            # Get tables and views with improved query
+            # Get tables and views with query compatible with SQL Server 2019
             cursor.execute("""
                 SELECT 
                     t.TABLE_SCHEMA,
@@ -429,7 +429,7 @@ class DataManager:
                     c.DATA_TYPE,
                     c.IS_NULLABLE,
                     c.COLUMN_DEFAULT,
-                    c.COLUMN_DESCRIPTION,
+                    '' AS COLUMN_DESCRIPTION, -- Column doesn't exist in SQL Server 2019, using empty string
                     c.ORDINAL_POSITION
                 FROM INFORMATION_SCHEMA.TABLES t
                 LEFT JOIN INFORMATION_SCHEMA.COLUMNS c 
@@ -440,14 +440,14 @@ class DataManager:
                 ORDER BY t.TABLE_NAME, c.ORDINAL_POSITION
             """.format(','.join(['?' for _ in excluded_schemas])), excluded_schemas)
 
-            # Get stored procedures with improved query
+            # Get stored procedures with query compatible with SQL Server 2019
             cursor.execute("""
                 SELECT 
                     ROUTINE_SCHEMA,
                     ROUTINE_NAME,
                     ROUTINE_TYPE,
                     ROUTINE_DEFINITION,
-                    ROUTINE_COMMENT,
+                    '' AS ROUTINE_COMMENT, -- Column doesn't exist in SQL Server 2019, using empty string
                     CREATED,
                     LAST_ALTERED
                 FROM INFORMATION_SCHEMA.ROUTINES
@@ -494,10 +494,10 @@ class DataManager:
                 schema, name, type, definition, comment, created, last_altered = row
                 stored_procs[name] = {
                     'schema': schema,
-                    'definition': definition,
+                    'definition': definition if definition else '',
                     'comment': comment,
-                    'created': created,
-                    'last_altered': last_altered
+                    'created': created if created else None,
+                    'last_altered': last_altered if last_altered else None
                 }
 
             result = {
