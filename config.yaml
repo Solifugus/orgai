@@ -1,5 +1,14 @@
 # AI Assistant Configuration
 
+# Organization Information
+organization:
+  name: "AmeriCU Credit Union"
+  description: "A member-owned financial cooperative serving members throughout Central and Northern New York."
+  founded: "1950"
+  headquarters: "Rome, NY"
+  industry: "Financial Services"
+  website: "https://www.americu.org"
+
 # Policy Documents
 policy_documents:
   enabled: true  # Enable policy document integration
@@ -9,7 +18,7 @@ policy_documents:
 
 # SQL Server Configuration
 sql_server:
-  enabled: true  # Enable database integration for testing
+  enabled: false  # Enable database integration for testing
   connection_string: "DRIVER={ODBC Driver 17 for SQL Server};SERVER=localhost;UID=test;PWD=test"
   databases:
     - name: "CoreDB"

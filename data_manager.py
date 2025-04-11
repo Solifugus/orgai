@@ -571,9 +571,9 @@ class DataManager:
             preview_scores = [self._similarity_ratio(term, preview_text) for term in important_terms] if important_terms else [0]
             preview_score = sum(preview_scores) / len(preview_scores) if preview_scores else 0
             
-            # Check for exact term matches in the preview
+            # Check for exact term matches in the preview - increased bonus
             if any(term in preview_text for term in important_terms):
-                preview_score += 0.2
+                preview_score += 0.3  # Increased from 0.2 to 0.3 for stronger exact matching
             
             # Improved weighted scoring system
             relevance_score = (
@@ -584,8 +584,8 @@ class DataManager:
                 author_score * 0.05           # Author is least important
             )
             
-            # Lower threshold for policy queries
-            threshold = 0.25 if query_contains_policy_term else 0.35
+            # Lower thresholds to include more potentially relevant documents
+            threshold = 0.20 if query_contains_policy_term else 0.30  # Lowered from 0.25/0.35
             
             if relevance_score > threshold:  # Dynamic threshold based on query type
                 results.append({

@@ -12,6 +12,8 @@ import json
 import gzip
 from base64 import b64encode
 import time
+import re
+import yaml
 
 app = FastAPI()
 
@@ -67,6 +69,12 @@ async def initialize_data_manager():
     """Initialize the data manager asynchronously."""
     global data_manager
     data_manager = DataManager()
+    # Load configuration for server
+    try:
+        with open('config.yaml', 'r') as f:
+            data_manager.config = yaml.safe_load(f)
+    except Exception as e:
+        print(f"Error loading config file: {e}")
     await data_manager._initialize_data_sources()
 
 def initialize_user(username: str):
@@ -294,7 +302,8 @@ async def process_prompt(prompt: str, context: str = "", username: str = "") -> 
             context_data = ""
             if policy_results:
                 context_parts = ["Relevant Policy Documents:"]
-                for result in policy_results[:3]:  # Limit to top 3 most relevant
+                # Increase from 3 to 5 most relevant documents for better coverage
+                for result in policy_results[:5]:
                     context_parts.append(f"- {result['name']}")
                     context_parts.append(f"  Category: {result['category']}")
                     context_parts.append(f"  Author: {result['author']}")
@@ -455,9 +464,24 @@ If this is a request for data and you need to execute a SQL query:
 3. Explain what the query will do
 """
         
+        # Add organization context
+        org_info = ""
+        if data_manager.config.get('organization'):
+            org = data_manager.config.get('organization')
+            org_info = f"""Organization Information:
+- Name: {org.get('name', 'Our Organization')}
+- Description: {org.get('description', '')}
+- Founded: {org.get('founded', '')}
+- Headquarters: {org.get('headquarters', '')}
+- Industry: {org.get('industry', '')}
+- Website: {org.get('website', '')}
+"""
+
         # Prepare the prompt with context and conversation history
         full_prompt = f"""Previous conversation context:
 {conversation_context}
+
+{org_info}
 
 {context_data}
 
@@ -467,54 +491,58 @@ User: {prompt}
 
 A: Let me help you with that."""
         
-        # Send request to Ollama
-        print("Sending request to Ollama...")
-        async with httpx.AsyncClient(timeout=300.0) as client:
-            data = {
-                "model": MODEL,
-                "prompt": full_prompt,
-                "stream": False,
-                "raw": True,
-                "num_ctx": 8192,
-                "num_thread": 4,
-                "temperature": 0.7,
-                "top_p": 0.9,
-                "num_predict": 8192
+        # Send request to Ollama API
+        print("Sending request to Ollama API...")
+        try:
+            # Create the messages for Ollama API
+            system_message = """You are an AI assistant for AmeriCU Credit Union. Your primary goal is to provide accurate and helpful information to users.
+
+IMPORTANT INSTRUCTIONS:
+1. FIRST try to answer questions using the information provided in the CONTEXT section
+2. When using policy information, explicitly mention "According to [policy name]" and include policy IDs
+3. If the CONTEXT doesn't contain information to answer the question:
+   a. Use the Organization Information provided
+   b. If still insufficient, provide general information based on your knowledge
+   c. CLEARLY indicate when you're providing general information by starting with "Based on general information:"
+4. Keep responses concise and focused
+5. NEVER say "I don't have information" or "I don't know" - instead, provide general information and clearly mark it as such
+6. NEVER claim to be an AI language model - you represent AmeriCU Credit Union
+7. NEVER contradict information provided in the CONTEXT or Organization Information
+
+For example, if asked about a vacation policy and no specific policy is in the CONTEXT, say something like:
+"Based on general information: While I don't see specific details about AmeriCU's vacation policy in our documents, typically credit unions offer paid time off for full-time employees. For details about AmeriCU's specific vacation benefits, please contact Human Resources."
+
+Your goal is to be helpful while prioritizing information from organizational policies.
+"""
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": full_prompt}
+            ]
+            
+            # Get model from config
+            model = data_manager.config.get('llm', {}).get('model', MODEL)
+            
+            # Prepare API request payload
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": data_manager.config.get('llm', {}).get('temperature', 0.7),
+                "top_p": data_manager.config.get('llm', {}).get('top_p', 0.9),
+                "stream": False
             }
-            try:
-                response = await client.post(OLLAMA_URL.replace("/chat", "/generate"), json=data)
+            
+            # Send request to Ollama API
+            async with httpx.AsyncClient(timeout=300.0) as client:
+                response = await client.post(OLLAMA_URL, json=payload)
+                
+                # Check for successful response
                 if response.status_code != 200:
-                    raise HTTPException(status_code=500, detail=f"Ollama API error: {response.text}")
+                    print(f"Ollama API error: {response.status_code}, {response.text}")
+                    raise HTTPException(status_code=502, detail=f"Error from Ollama API: {response.status_code}")
                 
-                result = response.json()
-                response_text = result.get("response", "")
-                
-                # For data queries, check if the model generated SQL that needs to be executed
-                if query_type == "data" and data_manager.config.get('sql_server', {}).get('allow_data_queries', False):
-                    # Try to extract SQL query from the response
-                    sql_pattern = r"```sql\s*(.*?)\s*```"
-                    sql_matches = re.findall(sql_pattern, response_text, re.DOTALL)
-                    
-                    if sql_matches:
-                        # Model generated SQL - try to execute it
-                        sql_query = sql_matches[0].strip()
-                        print(f"Executing AI-generated SQL query: {sql_query}")
-                        
-                        try:
-                            # Execute the SQL query
-                            results, table_string = data_manager.execute_sql_query(sql_query)
-                            
-                            # Replace the SQL code block with results
-                            response_with_results = response_text.replace(
-                                f"```sql\n{sql_query}\n```", 
-                                f"```sql\n{sql_query}\n```\n\nHere are the results:\n\n{table_string}"
-                            )
-                            
-                            # Use the enhanced response
-                            response_text = response_with_results
-                        except Exception as e:
-                            # Append error message but don't replace the original response
-                            response_text += f"\n\nI couldn't execute the SQL query: {str(e)}"
+                # Extract response text from Ollama response
+                response_data = response.json()
+                response_text = response_data.get("message", {}).get("content", "")
                 
                 # Add assistant's response to history
                 if username:
@@ -531,12 +559,14 @@ A: Let me help you with that."""
                     
                 print("Prompt processed successfully")
                 return response_text, context_data
-            except httpx.TimeoutException as e:
-                print(f"Timeout while communicating with Ollama: {str(e)}")
-                raise HTTPException(status_code=504, detail="Request to Ollama timed out. Please try again.")
-            except httpx.RequestError as e:
-                print(f"Error communicating with Ollama: {str(e)}")
-                raise HTTPException(status_code=503, detail=f"Error communicating with Ollama: {str(e)}")
+                
+        except httpx.RequestError as e:
+            print(f"Error connecting to Ollama API: {str(e)}")
+            raise HTTPException(status_code=503, detail=f"Could not connect to Ollama API: {str(e)}")
+        except Exception as e:
+            print(f"Error processing Ollama response: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error processing response: {str(e)}")
+            
     except Exception as e:
         print(f"Error in process_prompt: \nTraceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Processing error: {str(e)}")
