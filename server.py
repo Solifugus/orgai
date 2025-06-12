@@ -642,20 +642,12 @@ async def chat_endpoint(request: ChatRequest):
         if not response_text or len(response_text) < 10:  # Basic validation
             raise HTTPException(status_code=500, detail="Incomplete response from model")
         
-        # If response is large, compress it
-        if len(response_text) > 1000:
-            compressed = gzip.compress(response_text.encode('utf-8'))
-            response_text = b64encode(compressed).decode('utf-8')
-            return ChatResponse(
-                response=response_text,
-                context=new_context,
-                compressed=True,
-                encoding="gzip+base64"
-            )
-            
+        # Return response without compression for better compatibility
         return ChatResponse(
             response=response_text,
-            context=new_context
+            context=new_context,
+            compressed=False,
+            encoding="utf-8"
         )
     except HTTPException as e:
         print(f"HTTP error in chat_endpoint: {e.detail}")

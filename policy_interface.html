@@ -376,14 +376,7 @@
                 }
 
                 const data = await response.json();
-                let responseText = data.response;
-
-                // Handle compressed responses
-                if (data.compressed && data.encoding === 'gzip+base64') {
-                    // For simplicity in this demo, we'll just show that it's compressed
-                    // In a real implementation, you'd decompress on the client side
-                    responseText = '[Compressed response - would be decompressed in production]';
-                }
+                const responseText = data.response;
 
                 addMessage(responseText, false);
 

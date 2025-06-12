@@ -3,6 +3,8 @@
 # Service management script for AI Assistant
 # Usage: ./service.sh {start|stop|restart|status|install}
 
+source venv/bin/activate
+
 # Configuration
 APP_NAME="ai-assistant"
 APP_DIR="$(pwd)"
