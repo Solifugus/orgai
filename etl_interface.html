@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AmeriCU Data Analysis & Metadata Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 1.8rem;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 0.9rem;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            min-height: 300px;
+            max-height: 500px;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+        
+        .message.user {
+            justify-content: flex-end;
+        }
+        
+        .message-bubble {
+            max-width: 70%;
+            padding: 12px 16px;
+            border-radius: 18px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+        }
+        
+        .message.user .message-bubble {
+            background: #2d3748;
+            color: white;
+            border-bottom-right-radius: 6px;
+        }
+        
+        .message.assistant .message-bubble {
+            background: #f7fafc;
+            color: #2d3748;
+            border-bottom-left-radius: 6px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .message-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+        
+        .user-icon {
+            background: #2d3748;
+            color: white;
+        }
+        
+        .assistant-icon {
+            background: #e2e8f0;
+            color: #4a5568;
+        }
+        
+        .input-container {
+            padding: 20px;
+            border-top: 1px solid #e2e8f0;
+            background: #f8fafc;
+        }
+        
+        .input-row {
+            display: flex;
+            gap: 10px;
+            align-items: flex-end;
+        }
+        
+        .input-wrapper {
+            flex: 1;
+            position: relative;
+        }
+        
+        .input-field {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            resize: none;
+            min-height: 44px;
+            max-height: 120px;
+        }
+        
+        .input-field:focus {
+            border-color: #2d3748;
+        }
+        
+        .send-button {
+            background: #2d3748;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 44px;
+            height: 44px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color 0.2s;
+        }
+        
+        .send-button:hover:not(:disabled) {
+            background: #1a202c;
+        }
+        
+        .send-button:disabled {
+            background: #94a3b8;
+            cursor: not-allowed;
+        }
+        
+        .quick-questions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 15px;
+        }
+        
+        .quick-question {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 15px;
+            padding: 6px 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+        }
+        
+        .quick-question:hover {
+            background: #2d3748;
+            color: white;
+            border-color: #2d3748;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #4a5568;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 50%;
+            border-top-color: #2d3748;
+            animation: spin 1s ease-in-out infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        .welcome-message {
+            text-align: center;
+            padding: 40px 20px;
+            color: #4a5568;
+        }
+        
+        .welcome-message h3 {
+            color: #2d3748;
+            margin-bottom: 10px;
+        }
+        
+        .code-block {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            margin: 8px 0;
+            overflow-x: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                width: 95%;
+                margin: 10px;
+                max-height: 95vh;
+            }
+            
+            .header h1 {
+                font-size: 1.5rem;
+            }
+            
+            .message-bubble {
+                max-width: 85%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Data Analysis & Metadata</h1>
+            <p>Explore database schemas, data lineage, and metadata information</p>
+        </div>
+        
+        <div class="chat-container">
+            <div class="messages" id="messages">
+                <div class="welcome-message">
+                    <h3>Welcome to the Data Analysis Assistant!</h3>
+                    <p>I can help you explore database schemas, understand data lineage, find column information, and answer technical data questions. Try asking about tables, columns, or data sources.</p>
+                </div>
+            </div>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Analyzing data structure...</p>
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <div class="quick-questions">
+                <div class="quick-question" onclick="askQuestion('What tables are available in the database?')">Show Tables</div>
+                <div class="quick-question" onclick="askQuestion('Describe the customer table structure')">Customer Schema</div>
+                <div class="quick-question" onclick="askQuestion('Where does the account_balance column come from?')">Data Lineage</div>
+                <div class="quick-question" onclick="askQuestion('What are the key foreign key relationships?')">Relationships</div>
+                <div class="quick-question" onclick="askQuestion('Show me columns with customer data')">Customer Columns</div>
+            </div>
+            
+            <div class="input-row">
+                <div class="input-wrapper">
+                    <textarea 
+                        class="input-field" 
+                        id="messageInput" 
+                        placeholder="Ask about database schemas, data lineage, or column information..." 
+                        rows="1"
+                        onkeydown="handleKeyPress(event)"
+                    ></textarea>
+                </div>
+                <button class="send-button" onclick="sendMessage()" id="sendButton">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22,2 15,22 11,13 2,9"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const messagesContainer = document.getElementById('messages');
+        const messageInput = document.getElementById('messageInput');
+        const sendButton = document.getElementById('sendButton');
+        const loading = document.getElementById('loading');
+        const SERVER_URL = 'http://localhost:8000';
+        const MODE = 'etl';
+        const USERNAME = 'data_analyst_' + Math.random().toString(36).substr(2, 9);
+
+        function handleKeyPress(event) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendMessage();
+            }
+        }
+
+        function askQuestion(question) {
+            messageInput.value = question;
+            sendMessage();
+        }
+
+        function formatResponse(content) {
+            // Simple formatting for SQL code blocks
+            return content.replace(/```sql\n([\s\S]*?)\n```/g, '<div class="code-block">$1</div>');
+        }
+
+        function addMessage(content, isUser = false) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${isUser ? 'user' : 'assistant'}`;
+            
+            const icon = document.createElement('div');
+            icon.className = `message-icon ${isUser ? 'user-icon' : 'assistant-icon'}`;
+            icon.textContent = isUser ? '👤' : '📊';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            
+            if (isUser) {
+                bubble.textContent = content;
+            } else {
+                // Format response content
+                if (content.includes('```sql')) {
+                    bubble.innerHTML = formatResponse(content);
+                } else {
+                    bubble.textContent = content;
+                }
+            }
+            
+            if (isUser) {
+                messageDiv.appendChild(bubble);
+                messageDiv.appendChild(icon);
+            } else {
+                messageDiv.appendChild(icon);
+                messageDiv.appendChild(bubble);
+            }
+            
+            // Remove welcome message if it exists
+            const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+            if (welcomeMessage) {
+                welcomeMessage.remove();
+            }
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        async function sendMessage() {
+            const message = messageInput.value.trim();
+            if (!message) return;
+
+            // Disable input and show loading
+            messageInput.disabled = true;
+            sendButton.disabled = true;
+            loading.style.display = 'block';
+
+            // Add user message
+            addMessage(message, true);
+            messageInput.value = '';
+
+            try {
+                const response = await fetch(`${SERVER_URL}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user: USERNAME,
+                        prompt: message,
+                        mode: MODE
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                let responseText = data.response;
+
+                // Handle compressed responses
+                if (data.compressed && data.encoding === 'gzip+base64') {
+                    // For simplicity in this demo, we'll just show that it's compressed
+                    // In a real implementation, you'd decompress on the client side
+                    responseText = '[Compressed response - would be decompressed in production]';
+                }
+
+                addMessage(responseText, false);
+
+            } catch (error) {
+                console.error('Error:', error);
+                addMessage('Sorry, I encountered an error. Please try again.', false);
+            } finally {
+                // Re-enable input and hide loading
+                messageInput.disabled = false;
+                sendButton.disabled = false;
+                loading.style.display = 'none';
+                messageInput.focus();
+            }
+        }
+
+        // Auto-resize textarea
+        messageInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+        });
+
+        // Focus input on load
+        window.addEventListener('load', () => {
+            messageInput.focus();
+        });
+    </script>
+</body>
+</html>

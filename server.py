@@ -43,6 +43,7 @@ class QueueResponse(BaseModel):
 class ChatRequest(BaseModel):
     user: str
     prompt: str
+    mode: Optional[str] = "auto"  # "policy", "etl", or "auto" for intelligent routing
 
 class ChatResponse(BaseModel):
     response: str
@@ -135,14 +136,34 @@ def get_queue_number(username: str) -> int:
     queue_counters[username] += 1
     return queue_counters[username]
 
-def classify_query_type(prompt: str) -> str:
+def classify_query_type(prompt: str, mode: str = "auto") -> str:
     """
     Classify the query type to determine which data source to prioritize.
     Uses weighted keyword matching and prioritization rules.
     
+    Args:
+        prompt: The user's query
+        mode: The application mode ("policy", "etl", or "auto")
+    
     Returns:
         str: One of "policy", "database", "data", "documentation", or "general"
     """
+    # If mode is explicitly set, bias the classification
+    if mode == "policy":
+        # In policy mode, prioritize policy and documentation searches
+        if any(keyword in prompt.lower() for keyword in ["data", "database", "table", "column", "sql", "query", "etl"]):
+            return "general"  # Redirect data questions to general responses in policy mode
+        return "policy"  # Default to policy search in policy mode
+    elif mode == "etl":
+        # In ETL mode, prioritize database and data searches
+        if any(keyword in prompt.lower() for keyword in ["policy", "vacation", "hr", "handbook", "benefit"]):
+            return "general"  # Redirect policy questions to general responses in ETL mode
+        # Check for data vs database schema questions
+        if any(keyword in prompt.lower() for keyword in ["show me data", "get data", "retrieve data", "how many", "count", "list all"]):
+            return "data"
+        return "database"  # Default to database schema info in ETL mode
+    
+    # Auto mode - use existing intelligent classification
     prompt_lower = prompt.lower()
     
     # Policy-related keywords with weights
@@ -281,14 +302,14 @@ def classify_query_type(prompt: str) -> str:
     else:
         return "documentation"
 
-async def process_prompt(prompt: str, context: str = "", username: str = "") -> Tuple[str, str]:
+async def process_prompt(prompt: str, context: str = "", username: str = "", mode: str = "auto") -> Tuple[str, str]:
     """Process a prompt and return the response and updated context."""
     try:
         print("Processing prompt...")
         
         # Classify the query type
-        query_type = classify_query_type(prompt)
-        print(f"Query classified as: {query_type}")
+        query_type = classify_query_type(prompt, mode)
+        print(f"Query classified as: {query_type} (mode: {mode})")
         
         # Get appropriate context based on query type
         print(f"Getting context for {query_type} query...")
@@ -494,8 +515,38 @@ A: Let me help you with that."""
         # Send request to Ollama API
         print("Sending request to Ollama API...")
         try:
-            # Create the messages for Ollama API
-            system_message = """You are an AI assistant for AmeriCU Credit Union. Your primary goal is to provide accurate and helpful information to users.
+            # Create mode-specific system message
+            if mode == "policy":
+                system_message = """You are an AI assistant specializing in HR policies and procedures for AmeriCU Credit Union. Your primary goal is to help employees understand company policies, benefits, and procedures.
+
+IMPORTANT INSTRUCTIONS:
+1. Focus exclusively on HR policies, procedures, benefits, and company information
+2. When using policy information, explicitly mention "According to [policy name]" and include policy IDs
+3. If asked about technical data topics (databases, ETL, data analysis), politely redirect: "I specialize in HR policies and procedures. For technical data questions, please use the Data Analysis mode."
+4. If the CONTEXT doesn't contain policy information to answer the question:
+   a. Use the Organization Information provided
+   b. Provide general HR information and clearly mark it as such
+5. Keep responses employee-friendly and easy to understand
+6. NEVER claim to be an AI language model - you represent AmeriCU Credit Union HR
+
+Your goal is to help employees navigate company policies and procedures effectively.
+"""
+            elif mode == "etl":
+                system_message = """You are an AI assistant specializing in data analysis and database information for AmeriCU Credit Union. Your primary goal is to help data analysts understand data structures, sources, and relationships.
+
+IMPORTANT INSTRUCTIONS:
+1. Focus exclusively on database schemas, data lineage, ETL processes, and technical data information
+2. When providing database information, include table structures, column details, and relationships
+3. If asked about HR policies or employee benefits, politely redirect: "I specialize in data and database information. For HR policy questions, please use the Policy mode."
+4. Help users understand where data comes from, how it's transformed, and where it's stored
+5. Provide technical details about data types, constraints, and relationships
+6. When generating SQL queries, ensure they are read-only and follow security best practices
+7. NEVER claim to be an AI language model - you represent AmeriCU Credit Union Data Team
+
+Your goal is to help data analysts understand and work with organizational data effectively.
+"""
+            else:
+                system_message = """You are an AI assistant for AmeriCU Credit Union. Your primary goal is to provide accurate and helpful information to users.
 
 IMPORTANT INSTRUCTIONS:
 1. FIRST try to answer questions using the information provided in the CONTEXT section
@@ -583,8 +634,8 @@ async def chat_endpoint(request: ChatRequest):
         # Initialize user context if needed
         initialize_user(request.user)
             
-        print(f"Processing request for user {request.user} with prompt: {request.prompt}")
-        response_text, new_context = await process_prompt(request.prompt, username=request.user)
+        print(f"Processing request for user {request.user} with prompt: {request.prompt} (mode: {request.mode})")
+        response_text, new_context = await process_prompt(request.prompt, username=request.user, mode=request.mode)
         
         # Ensure the response is complete
         if not response_text or len(response_text) < 10:  # Basic validation
@@ -624,6 +675,35 @@ async def clear_chat_history(request: ChatRequest):
         return {"status": "success", "message": "Conversation history cleared"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error clearing history: {str(e)}")
+
+@app.get("/modes")
+async def get_available_modes():
+    """Get the available application modes."""
+    return {
+        "modes": [
+            {
+                "id": "policy",
+                "name": "HR Policies & Procedures",
+                "description": "Find information about company policies, benefits, procedures, and HR-related topics",
+                "icon": "👥",
+                "target_users": "Employees, HR staff"
+            },
+            {
+                "id": "etl",
+                "name": "Data Analysis & Metadata",
+                "description": "Explore database schemas, data lineage, column information, and data sources",
+                "icon": "📊",
+                "target_users": "Data analysts, BI developers"
+            },
+            {
+                "id": "auto",
+                "name": "Smart Assistant",
+                "description": "Automatically routes questions to the most appropriate data source",
+                "icon": "🤖",
+                "target_users": "General users"
+            }
+        ]
+    }
 
 @app.on_event("startup")
 async def startup_event():

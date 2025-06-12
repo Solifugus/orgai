@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AmeriCU AI Assistant</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 900px;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .header {
+            margin-bottom: 40px;
+        }
+        
+        .logo {
+            font-size: 3rem;
+            margin-bottom: 20px;
+        }
+        
+        .header h1 {
+            color: #2d3748;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            color: #4a5568;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #718096;
+            font-size: 0.95rem;
+        }
+        
+        .modes-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+        
+        .mode-card {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 16px;
+            padding: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+        
+        .mode-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.1);
+            border-color: #cbd5e0;
+        }
+        
+        .mode-card.policy:hover {
+            border-color: #4c63d2;
+        }
+        
+        .mode-card.etl:hover {
+            border-color: #2d3748;
+        }
+        
+        .mode-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+        
+        .mode-title {
+            color: #2d3748;
+            font-size: 1.4rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+        
+        .mode-description {
+            color: #4a5568;
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+        
+        .mode-users {
+            color: #718096;
+            font-size: 0.85rem;
+            font-style: italic;
+        }
+        
+        .features {
+            background: #f8fafc;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .features h3 {
+            color: #2d3748;
+            margin-bottom: 15px;
+            font-size: 1.2rem;
+        }
+        
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+            text-align: left;
+        }
+        
+        .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #4a5568;
+            font-size: 0.9rem;
+        }
+        
+        .feature-icon {
+            color: #4c63d2;
+            font-weight: bold;
+        }
+        
+        .footer {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            color: #718096;
+            font-size: 0.85rem;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .modes-container {
+                grid-template-columns: 1fr;
+            }
+            
+            .mode-card {
+                padding: 25px;
+            }
+            
+            .feature-list {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #48bb78;
+            margin-left: 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">🏛️</div>
+            <h1>AmeriCU AI Assistant</h1>
+            <p>Choose your specialized interface below</p>
+            <div class="subtitle">
+                Intelligent assistance tailored to your role and needs
+                <span class="status-indicator" title="System Online"></span>
+            </div>
+        </div>
+        
+        <div class="modes-container">
+            <div class="mode-card policy" onclick="openMode('policy')">
+                <span class="mode-icon">👥</span>
+                <h3 class="mode-title">HR Policies & Procedures</h3>
+                <p class="mode-description">
+                    Find information about company policies, benefits, procedures, and HR-related topics. 
+                    Get answers about vacation policies, sick leave, holidays, dress codes, and more.
+                </p>
+                <p class="mode-users">For: Employees, HR Staff, Managers</p>
+            </div>
+            
+            <div class="mode-card etl" onclick="openMode('etl')">
+                <span class="mode-icon">📊</span>
+                <h3 class="mode-title">Data Analysis & Metadata</h3>
+                <p class="mode-description">
+                    Explore database schemas, data lineage, column information, and data sources. 
+                    Understand where data comes from, how it's structured, and how it flows through systems.
+                </p>
+                <p class="mode-users">For: Data Analysts, BI Developers, Data Engineers</p>
+            </div>
+        </div>
+        
+        <div class="features">
+            <h3>✨ Key Features</h3>
+            <div class="feature-list">
+                <div class="feature-item">
+                    <span class="feature-icon">🔍</span>
+                    <span>Intelligent search across organizational data</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">💬</span>
+                    <span>Natural language conversation interface</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🎯</span>
+                    <span>Mode-specific responses optimized for your role</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">📚</span>
+                    <span>Access to policies, procedures, and documentation</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🗃️</span>
+                    <span>Database schema and metadata exploration</span>
+                </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🔒</span>
+                    <span>Secure and compliant data access</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>AmeriCU Credit Union AI Assistant | Powered by Advanced Language Models</p>
+            <p>For technical support or questions, contact the IT department</p>
+        </div>
+    </div>
+
+    <script>
+        function openMode(mode) {
+            if (mode === 'policy') {
+                window.location.href = 'policy_interface.html';
+            } else if (mode === 'etl') {
+                window.location.href = 'etl_interface.html';
+            }
+        }
+
+        // Add keyboard navigation
+        document.addEventListener('keydown', function(event) {
+            if (event.key === '1') {
+                openMode('policy');
+            } else if (event.key === '2') {
+                openMode('etl');
+            }
+        });
+
+        // Add visual feedback for keyboard shortcuts
+        document.addEventListener('DOMContentLoaded', function() {
+            const cards = document.querySelectorAll('.mode-card');
+            cards.forEach((card, index) => {
+                const shortcutSpan = document.createElement('span');
+                shortcutSpan.style.cssText = 'position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.1); color: #666; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; font-weight: bold;';
+                shortcutSpan.textContent = `Press ${index + 1}`;
+                card.style.position = 'relative';
+                card.appendChild(shortcutSpan);
+            });
+        });
+    </script>
+</body>
+</html>
