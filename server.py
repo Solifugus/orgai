@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import httpx
 from typing import List, Dict, Optional, Tuple
@@ -20,7 +21,7 @@ app = FastAPI()
 # Add CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("CORS_ALLOWED_ORIGINS", "https://frontendurl")],
+    allow_origins=["*"],  # Allow all origins for development
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -704,6 +705,27 @@ async def get_available_modes():
             }
         ]
     }
+
+# Serve static files for the web interfaces
+@app.get("/")
+async def read_root():
+    """Redirect to the main interface selection page."""
+    return FileResponse("index.html")
+
+@app.get("/index.html")
+async def read_index():
+    """Serve the main interface selection page."""
+    return FileResponse("index.html")
+
+@app.get("/policy_interface.html")
+async def read_policy_interface():
+    """Serve the policy interface."""
+    return FileResponse("policy_interface.html")
+
+@app.get("/etl_interface.html") 
+async def read_etl_interface():
+    """Serve the ETL interface."""
+    return FileResponse("etl_interface.html")
 
 @app.on_event("startup")
 async def startup_event():

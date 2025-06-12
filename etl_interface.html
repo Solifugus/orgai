@@ -13,7 +13,7 @@
         
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0684ce 0%, #1e5799 100%);
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -33,7 +33,7 @@
         }
         
         .header {
-            background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+            background: linear-gradient(135deg, #1e5799 0%, #0684ce 100%);
             color: white;
             padding: 20px;
             text-align: center;
@@ -84,14 +84,14 @@
         }
         
         .message.user .message-bubble {
-            background: #2d3748;
+            background: #1e5799;
             color: white;
             border-bottom-right-radius: 6px;
         }
         
         .message.assistant .message-bubble {
             background: #f7fafc;
-            color: #2d3748;
+            color: #333;
             border-bottom-left-radius: 6px;
             border: 1px solid #e2e8f0;
         }
@@ -108,13 +108,13 @@
         }
         
         .user-icon {
-            background: #2d3748;
+            background: #1e5799;
             color: white;
         }
         
         .assistant-icon {
             background: #e2e8f0;
-            color: #4a5568;
+            color: #0684ce;
         }
         
         .input-container {
@@ -148,11 +148,11 @@
         }
         
         .input-field:focus {
-            border-color: #2d3748;
+            border-color: #1e5799;
         }
         
         .send-button {
-            background: #2d3748;
+            background: #1e5799;
             color: white;
             border: none;
             border-radius: 50%;
@@ -166,7 +166,7 @@
         }
         
         .send-button:hover:not(:disabled) {
-            background: #1a202c;
+            background: #0684ce;
         }
         
         .send-button:disabled {
@@ -193,16 +193,16 @@
         }
         
         .quick-question:hover {
-            background: #2d3748;
+            background: #1e5799;
             color: white;
-            border-color: #2d3748;
+            border-color: #1e5799;
         }
         
         .loading {
             display: none;
             text-align: center;
             padding: 20px;
-            color: #4a5568;
+            color: #666;
         }
         
         .spinner {
@@ -211,7 +211,7 @@
             height: 20px;
             border: 2px solid #e2e8f0;
             border-radius: 50%;
-            border-top-color: #2d3748;
+            border-top-color: #1e5799;
             animation: spin 1s ease-in-out infinite;
         }
         
@@ -222,23 +222,24 @@
         .welcome-message {
             text-align: center;
             padding: 40px 20px;
-            color: #4a5568;
+            color: #666;
         }
         
         .welcome-message h3 {
-            color: #2d3748;
+            color: #1e5799;
             margin-bottom: 10px;
         }
         
         .code-block {
-            background: #1a202c;
-            color: #e2e8f0;
+            background: #1e5799;
+            color: #ffffff;
             padding: 12px;
             border-radius: 8px;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
             font-size: 13px;
             margin: 8px 0;
             overflow-x: auto;
+            border-left: 4px solid #0684ce;
         }
         
         @media (max-width: 768px) {
