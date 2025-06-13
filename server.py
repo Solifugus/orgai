@@ -514,7 +514,7 @@ User: {prompt}
 A: Let me help you with that."""
         
         # Send request to Ollama API
-        print("Sending request to Ollama API...")
+        print(f"Sending request to Ollama API with prompt length: {len(full_prompt)} characters...")
         try:
             # Create mode-specific system message
             if mode == "policy":
@@ -583,8 +583,9 @@ Your goal is to be helpful while prioritizing information from organizational po
                 "stream": False
             }
             
-            # Send request to Ollama API
-            async with httpx.AsyncClient(timeout=300.0) as client:
+            # Send request to Ollama API with longer timeout
+            timeout = httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 response = await client.post(OLLAMA_URL, json=payload)
                 
                 # Check for successful response

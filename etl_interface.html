@@ -389,6 +389,10 @@
             messageInput.value = '';
 
             try {
+                // Create AbortController for timeout handling
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
+
                 const response = await fetch(`${SERVER_URL}/chat`, {
                     method: 'POST',
                     headers: {
@@ -398,8 +402,11 @@
                         user: USERNAME,
                         prompt: message,
                         mode: MODE
-                    })
+                    }),
+                    signal: controller.signal
                 });
+
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     throw new Error(`Server error: ${response.status}`);
@@ -412,7 +419,13 @@
 
             } catch (error) {
                 console.error('Error:', error);
-                addMessage('Sorry, I encountered an error. Please try again.', false);
+                if (error.name === 'AbortError') {
+                    addMessage('Request timed out. The AI model is taking longer than expected. Please try a shorter question or try again later.', false);
+                } else if (error.message.includes('Server error: 500')) {
+                    addMessage('The AI model is experiencing issues. Please check that Ollama is running and try again.', false);
+                } else {
+                    addMessage('Sorry, I encountered an error. Please try again.', false);
+                }
             } finally {
                 // Re-enable input and hide loading
                 messageInput.disabled = false;
