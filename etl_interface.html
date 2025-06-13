@@ -271,6 +271,7 @@
                 <div class="welcome-message">
                     <h3>Welcome to the Data Analysis Assistant!</h3>
                     <p>I can help you explore database schemas, understand data lineage, find column information, and answer technical data questions. Try asking about tables, columns, or data sources.</p>
+                    <p style="font-size: 0.8rem; color: #1e5799; margin-top: 10px;">✨ <strong>Enhanced with streaming responses</strong> - You'll see answers appear as they're generated!</p>
                 </div>
             </div>
             
@@ -389,11 +390,7 @@
             messageInput.value = '';
 
             try {
-                // Create AbortController for timeout handling
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minute timeout
-
-                const response = await fetch(`${SERVER_URL}/chat`, {
+                const response = await fetch(`${SERVER_URL}/chat/stream`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -402,26 +399,90 @@
                         user: USERNAME,
                         prompt: message,
                         mode: MODE
-                    }),
-                    signal: controller.signal
+                    })
                 });
-
-                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     throw new Error(`Server error: ${response.status}`);
                 }
 
-                const data = await response.json();
-                const responseText = data.response;
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let responseText = '';
+                let assistantMessageDiv = null;
+                let assistantBubble = null;
 
-                addMessage(responseText, false);
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+
+                    const chunk = decoder.decode(value, { stream: true });
+                    const lines = chunk.split('\n');
+
+                    for (const line of lines) {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.slice(6));
+                                
+                                if (data.type === 'status') {
+                                    // Update loading text in the loading div
+                                    const loadingDiv = document.querySelector('.loading p');
+                                    if (loadingDiv) {
+                                        loadingDiv.textContent = data.message;
+                                    }
+                                } else if (data.type === 'chunk') {
+                                    // Create assistant message bubble if it doesn't exist
+                                    if (!assistantMessageDiv) {
+                                        assistantMessageDiv = document.createElement('div');
+                                        assistantMessageDiv.className = 'message assistant';
+                                        
+                                        const icon = document.createElement('div');
+                                        icon.className = 'message-icon assistant-icon';
+                                        icon.textContent = '📊';
+                                        
+                                        assistantBubble = document.createElement('div');
+                                        assistantBubble.className = 'message-bubble';
+                                        
+                                        assistantMessageDiv.appendChild(icon);
+                                        assistantMessageDiv.appendChild(assistantBubble);
+                                        
+                                        // Remove welcome message if it exists
+                                        const welcomeMessage = messagesContainer.querySelector('.welcome-message');
+                                        if (welcomeMessage) {
+                                            welcomeMessage.remove();
+                                        }
+                                        
+                                        messagesContainer.appendChild(assistantMessageDiv);
+                                        loading.style.display = 'none';
+                                    }
+                                    
+                                    // Append the chunk to the response
+                                    responseText += data.content;
+                                    
+                                    // Format response content (handle SQL code blocks)
+                                    if (responseText.includes('```sql')) {
+                                        assistantBubble.innerHTML = formatResponse(responseText);
+                                    } else {
+                                        assistantBubble.textContent = responseText;
+                                    }
+                                    
+                                    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                                } else if (data.type === 'done') {
+                                    console.log('Streaming complete');
+                                    break;
+                                } else if (data.type === 'error') {
+                                    throw new Error(data.message);
+                                }
+                            } catch (e) {
+                                console.warn('Failed to parse SSE data:', line, e);
+                            }
+                        }
+                    }
+                }
 
             } catch (error) {
                 console.error('Error:', error);
-                if (error.name === 'AbortError') {
-                    addMessage('Request timed out. The AI model is taking longer than expected. Please try a shorter question or try again later.', false);
-                } else if (error.message.includes('Server error: 500')) {
+                if (error.message.includes('Server error: 500')) {
                     addMessage('The AI model is experiencing issues. Please check that Ollama is running and try again.', false);
                 } else {
                     addMessage('Sorry, I encountered an error. Please try again.', false);

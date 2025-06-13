@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 import httpx
@@ -324,15 +324,14 @@ async def process_prompt(prompt: str, context: str = "", username: str = "", mod
             context_data = ""
             if policy_results:
                 context_parts = ["Relevant Policy Documents:"]
-                # Increase from 3 to 5 most relevant documents for better coverage
-                for result in policy_results[:5]:
+                # Limit to 2 most relevant documents and shorter previews to reduce token count
+                for result in policy_results[:2]:
                     context_parts.append(f"- {result['name']}")
                     context_parts.append(f"  Category: {result['category']}")
                     context_parts.append(f"  Author: {result['author']}")
-                    context_parts.append(f"  Applicability: {result['applicability_group']}")
-                    context_parts.append(f"  Preview: {result['preview']}")
-                    if result.get('urls', {}).get('direct'):
-                        context_parts.append(f"  URL: {result['urls']['direct']}")
+                    # Truncate preview to prevent huge context
+                    preview = result['preview'][:300] + "..." if len(result['preview']) > 300 else result['preview']
+                    context_parts.append(f"  Preview: {preview}")
                 context_data = "\n".join(context_parts)
         elif query_type == "database":
             db_results = data_manager.get_relevant_database_info(prompt)
@@ -499,22 +498,24 @@ If this is a request for data and you need to execute a SQL query:
 - Website: {org.get('website', '')}
 """
 
-        # Prepare the prompt with context and conversation history
+        # Prepare the prompt with context and conversation history (keep it concise)
+        # Limit conversation context to prevent huge prompts
+        limited_conversation = conversation_context[:1000] + "..." if len(conversation_context) > 1000 else conversation_context
+        limited_context = context_data[:2000] + "..." if len(context_data) > 2000 else context_data
+        
         full_prompt = f"""Previous conversation context:
-{conversation_context}
+{limited_conversation}
 
 {org_info}
 
-{context_data}
-
-{sql_instruction}
+{limited_context}
 
 User: {prompt}
 
 A: Let me help you with that."""
         
         # Send request to Ollama API
-        print(f"Sending request to Ollama API with prompt length: {len(full_prompt)} characters...")
+        print("Sending request to Ollama API...")
         try:
             # Create mode-specific system message
             if mode == "policy":
@@ -660,6 +661,167 @@ async def chat_endpoint(request: ChatRequest):
             status_code=500,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+
+@app.post("/chat/stream")
+async def chat_stream_endpoint(request: ChatRequest):
+    """Handle streaming chat requests."""
+    async def generate_stream():
+        try:
+            if data_manager is None:
+                await initialize_data_manager()
+            
+            # Initialize user context if needed
+            initialize_user(request.user)
+            
+            print(f"Processing streaming request for user {request.user} with prompt: {request.prompt} (mode: {request.mode})")
+            
+            # Send initial status
+            yield f"data: {{\"type\": \"status\", \"message\": \"Searching for relevant information...\"}}\n\n"
+            
+            # Get context (this is the slow part)
+            query_type = classify_query_type(request.prompt, request.mode)
+            context_data = ""
+            
+            if query_type == "policy":
+                yield f"data: {{\"type\": \"status\", \"message\": \"Found policy documents, processing...\"}}\n\n"
+                policy_results = data_manager.search_policy_documents(request.prompt)
+                if policy_results:
+                    context_parts = ["Relevant Policy Documents:"]
+                    for result in policy_results[:2]:
+                        context_parts.append(f"- {result['name']}")
+                        context_parts.append(f"  Category: {result['category']}")
+                        context_parts.append(f"  Author: {result['author']}")
+                        preview = result['preview'][:300] + "..." if len(result['preview']) > 300 else result['preview']
+                        context_parts.append(f"  Preview: {preview}")
+                    context_data = "\n".join(context_parts)
+            elif query_type == "database":
+                yield f"data: {{\"type\": \"status\", \"message\": \"Analyzing database schema...\"}}\n\n"
+                db_results = data_manager.get_relevant_database_info(request.prompt)
+                if db_results:
+                    context_parts = ["Relevant Database Information:"]
+                    for result in db_results[:3]:
+                        if result['type'] == 'table':
+                            context_parts.append(f"- Database: {result['database']}")
+                            context_parts.append(f"  Table: {result['schema']}.{result['name']}")
+                            context_parts.append("  Columns:")
+                            for col in result['columns'][:5]:  # Limit columns shown
+                                desc = f" ({col['description']})" if col.get('description') else ""
+                                context_parts.append(f"    - {col['name']}: {col['type']}{desc}")
+                    context_data = "\n".join(context_parts)
+            
+            yield f"data: {{\"type\": \"status\", \"message\": \"Generating AI response...\"}}\n\n"
+            
+            # Add user's prompt to history
+            if request.user:
+                add_to_history(request.user, "user", request.prompt)
+            
+            # Get conversation context
+            conversation_context = get_conversation_context(request.user) if request.user else ""
+            
+            # Prepare limited context
+            limited_conversation = conversation_context[:1000] + "..." if len(conversation_context) > 1000 else conversation_context
+            limited_context = context_data[:2000] + "..." if len(context_data) > 2000 else context_data
+            
+            # Get organization info
+            org_info = ""
+            if data_manager.config.get('organization'):
+                org = data_manager.config.get('organization')
+                org_info = f"""Organization Information:
+- Name: {org.get('name', 'Our Organization')}
+- Description: {org.get('description', '')}
+"""
+            
+            full_prompt = f"""Previous conversation context:
+{limited_conversation}
+
+{org_info}
+
+{limited_context}
+
+User: {request.prompt}
+
+A: Let me help you with that."""
+            
+            # Create mode-specific system message
+            if request.mode == "policy":
+                system_message = """You are an AI assistant specializing in loan origination policies and financial services procedures for AmeriCU Credit Union. Your primary goal is to help loan officers, underwriters, and financial staff understand lending policies, underwriting procedures, and compliance guidelines.
+
+IMPORTANT INSTRUCTIONS:
+1. Focus exclusively on loan policies, underwriting procedures, financial services guidelines, and lending compliance
+2. When using policy information, explicitly mention "According to [policy name]" and include policy IDs
+3. If asked about technical data topics, politely redirect to Data Analysis mode
+4. Keep responses professional and focused on lending operations
+5. NEVER claim to be an AI language model - you represent AmeriCU Credit Union Lending Department"""
+            elif request.mode == "etl":
+                system_message = """You are an AI assistant specializing in data analysis and database information for AmeriCU Credit Union. Your primary goal is to help data analysts understand data structures, sources, and relationships.
+
+IMPORTANT INSTRUCTIONS:
+1. Focus exclusively on database schemas, data lineage, ETL processes, and technical data information
+2. When providing database information, include table structures, column details, and relationships
+3. If asked about policies, politely redirect to Policy mode
+4. Help users understand where data comes from, how it's transformed, and where it's stored
+5. NEVER claim to be an AI language model - you represent AmeriCU Credit Union Data Team"""
+            else:
+                system_message = """You are an AI assistant for AmeriCU Credit Union. Provide accurate and helpful information using the CONTEXT section when available. When using policy information, mention the policy name and ID. If CONTEXT is insufficient, use Organization Information and clearly mark general information. Keep responses concise and focused. NEVER claim to be an AI language model - you represent AmeriCU Credit Union."""
+            
+            messages = [
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": full_prompt}
+            ]
+            
+            # Get model from config
+            model = data_manager.config.get('llm', {}).get('model', MODEL)
+            
+            # Prepare API request payload with streaming
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": data_manager.config.get('llm', {}).get('temperature', 0.7),
+                "top_p": data_manager.config.get('llm', {}).get('top_p', 0.9),
+                "stream": True
+            }
+            
+            # Send streaming request to Ollama API
+            timeout = httpx.Timeout(connect=30.0, read=300.0, write=30.0, pool=30.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                async with client.stream("POST", OLLAMA_URL, json=payload) as response:
+                    if response.status_code != 200:
+                        yield f"data: {{\"type\": \"error\", \"message\": \"Error from Ollama API: {response.status_code}\"}}\n\n"
+                        return
+                    
+                    response_text = ""
+                    async for line in response.aiter_lines():
+                        if line.strip():
+                            try:
+                                chunk = json.loads(line)
+                                if "message" in chunk and "content" in chunk["message"]:
+                                    content = chunk["message"]["content"]
+                                    response_text += content
+                                    # Send the chunk to client
+                                    yield f"data: {{\"type\": \"chunk\", \"content\": {json.dumps(content)}}}\n\n"
+                                
+                                if chunk.get("done", False):
+                                    # Add assistant's response to history
+                                    if request.user:
+                                        add_to_history(request.user, "assistant", response_text)
+                                    yield f"data: {{\"type\": \"done\", \"context\": {json.dumps(context_data)}}}\n\n"
+                                    break
+                            except json.JSONDecodeError:
+                                continue
+        
+        except Exception as e:
+            print(f"Error in streaming chat: {str(e)}")
+            yield f"data: {{\"type\": \"error\", \"message\": \"An error occurred: {str(e)}\"}}\n\n"
+    
+    return StreamingResponse(
+        generate_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream"
+        }
+    )
 
 @app.post("/chat/clear")
 async def clear_chat_history(request: ChatRequest):
