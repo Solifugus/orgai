@@ -518,19 +518,19 @@ A: Let me help you with that."""
         try:
             # Create mode-specific system message
             if mode == "policy":
-                system_message = """You are an AI assistant specializing in HR policies and procedures for AmeriCU Credit Union. Your primary goal is to help employees understand company policies, benefits, and procedures.
+                system_message = """You are an AI assistant specializing in loan origination policies and financial services procedures for AmeriCU Credit Union. Your primary goal is to help loan officers, underwriters, and financial staff understand lending policies, underwriting procedures, and compliance guidelines.
 
 IMPORTANT INSTRUCTIONS:
-1. Focus exclusively on HR policies, procedures, benefits, and company information
+1. Focus exclusively on loan policies, underwriting procedures, financial services guidelines, and lending compliance
 2. When using policy information, explicitly mention "According to [policy name]" and include policy IDs
-3. If asked about technical data topics (databases, ETL, data analysis), politely redirect: "I specialize in HR policies and procedures. For technical data questions, please use the Data Analysis mode."
+3. If asked about technical data topics (databases, ETL, data analysis), politely redirect: "I specialize in loan policies and procedures. For technical data questions, please use the Data Analysis mode."
 4. If the CONTEXT doesn't contain policy information to answer the question:
    a. Use the Organization Information provided
-   b. Provide general HR information and clearly mark it as such
-5. Keep responses employee-friendly and easy to understand
-6. NEVER claim to be an AI language model - you represent AmeriCU Credit Union HR
+   b. Provide general lending information and clearly mark it as such
+5. Keep responses professional and focused on lending operations
+6. NEVER claim to be an AI language model - you represent AmeriCU Credit Union Lending Department
 
-Your goal is to help employees navigate company policies and procedures effectively.
+Your goal is to help staff navigate loan origination policies, underwriting procedures, and compliance requirements effectively.
 """
             elif mode == "etl":
                 system_message = """You are an AI assistant specializing in data analysis and database information for AmeriCU Credit Union. Your primary goal is to help data analysts understand data structures, sources, and relationships.
@@ -676,10 +676,10 @@ async def get_available_modes():
         "modes": [
             {
                 "id": "policy",
-                "name": "HR Policies & Procedures",
-                "description": "Find information about company policies, benefits, procedures, and HR-related topics",
-                "icon": "👥",
-                "target_users": "Employees, HR staff"
+                "name": "Loan Policies & Procedures",
+                "description": "Find information about loan origination policies, underwriting procedures, and financial services guidelines",
+                "icon": "📋",
+                "target_users": "Loan officers, underwriters, financial staff"
             },
             {
                 "id": "etl",
@@ -718,6 +718,11 @@ async def read_policy_interface():
 async def read_etl_interface():
     """Serve the ETL interface."""
     return FileResponse("etl_interface.html")
+
+@app.get("/policy_browser.html")
+async def read_policy_browser():
+    """Serve the policy document browser."""
+    return FileResponse("policy_browser.html")
 
 @app.on_event("startup")
 async def startup_event():

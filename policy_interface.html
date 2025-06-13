@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AmeriCU HR Policies & Procedures Assistant</title>
+    <title>AmeriCU Loan Policies & Procedures Assistant</title>
     <style>
         * {
             margin: 0;
@@ -247,15 +247,15 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>👥 HR Policies & Procedures</h1>
-            <p>Ask me about company policies, benefits, procedures, and HR information</p>
+            <h1>📋 Loan Policies & Procedures</h1>
+            <p>Ask me about loan origination policies, underwriting procedures, and financial services guidelines</p>
         </div>
         
         <div class="chat-container">
             <div class="messages" id="messages">
                 <div class="welcome-message">
-                    <h3>Welcome to the HR Assistant!</h3>
-                    <p>I can help you find information about AmeriCU's policies, benefits, and procedures. Try asking about vacation policies, sick leave, or any HR-related questions.</p>
+                    <h3>Welcome to the Loan Policy Assistant!</h3>
+                    <p>I can help you find information about AmeriCU's loan origination policies, underwriting procedures, and financial services guidelines. Try asking about loan requirements, approval processes, or compliance procedures.</p>
                 </div>
             </div>
             
@@ -267,11 +267,11 @@
         
         <div class="input-container">
             <div class="quick-questions">
-                <div class="quick-question" onclick="askQuestion('What is the vacation policy?')">Vacation Policy</div>
-                <div class="quick-question" onclick="askQuestion('What are the sick leave benefits?')">Sick Leave</div>
-                <div class="quick-question" onclick="askQuestion('What holidays does AmeriCU observe?')">Holidays</div>
-                <div class="quick-question" onclick="askQuestion('What are the employee benefits?')">Benefits</div>
-                <div class="quick-question" onclick="askQuestion('What is the dress code policy?')">Dress Code</div>
+                <div class="quick-question" onclick="askQuestion('What are the auto loan requirements?')">Auto Loans</div>
+                <div class="quick-question" onclick="askQuestion('What is the mortgage approval process?')">Mortgage Process</div>
+                <div class="quick-question" onclick="askQuestion('What are the underwriting guidelines?')">Underwriting</div>
+                <div class="quick-question" onclick="askQuestion('What are the credit requirements for personal loans?')">Personal Loans</div>
+                <div class="quick-question" onclick="askQuestion('What compliance procedures must be followed?')">Compliance</div>
             </div>
             
             <div class="input-row">
@@ -279,7 +279,7 @@
                     <textarea 
                         class="input-field" 
                         id="messageInput" 
-                        placeholder="Ask about policies, benefits, or procedures..." 
+                        placeholder="Ask about loan policies, underwriting procedures, or compliance guidelines..." 
                         rows="1"
                         onkeydown="handleKeyPress(event)"
                     ></textarea>
@@ -301,7 +301,7 @@
         const loading = document.getElementById('loading');
         const SERVER_URL = 'http://localhost:8000';
         const MODE = 'policy';
-        const USERNAME = 'hr_user_' + Math.random().toString(36).substr(2, 9);
+        const USERNAME = 'loan_officer_' + Math.random().toString(36).substr(2, 9);
 
         function handleKeyPress(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
@@ -398,9 +398,20 @@
             this.style.height = Math.min(this.scrollHeight, 120) + 'px';
         });
 
-        // Focus input on load
+        // Check for preloaded question and focus input on load
         window.addEventListener('load', () => {
             messageInput.focus();
+            
+            // Check for preload parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const preloadQuestion = urlParams.get('preload');
+            if (preloadQuestion) {
+                messageInput.value = preloadQuestion;
+                // Auto-send the question after a brief delay
+                setTimeout(() => {
+                    sendMessage();
+                }, 500);
+            }
         });
     </script>
 </body>

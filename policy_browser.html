@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AmeriCU Policy Document Browser</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0684ce 0%, #1e5799 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            max-width: 1200px;
+            margin: 0 auto;
+            overflow: hidden;
+            min-height: 90vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #0684ce 0%, #1e5799 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            margin-bottom: 5px;
+        }
+        
+        .header p {
+            opacity: 0.9;
+            font-size: 1rem;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            min-height: 0;
+        }
+        
+        .sidebar {
+            width: 350px;
+            background: #f8fafc;
+            border-right: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .search-section {
+            padding: 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+        }
+        
+        .search-input:focus {
+            border-color: #0684ce;
+        }
+        
+        .filters {
+            padding: 15px 20px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        
+        .filter-group {
+            margin-bottom: 15px;
+        }
+        
+        .filter-label {
+            font-weight: 600;
+            color: #1e5799;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .filter-select {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        
+        .document-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+        }
+        
+        .document-item {
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .document-item:hover {
+            border-color: #0684ce;
+            box-shadow: 0 2px 8px rgba(6, 132, 206, 0.1);
+        }
+        
+        .document-item.selected {
+            border-color: #0684ce;
+            background: #f0f9ff;
+        }
+        
+        .document-title {
+            font-weight: 600;
+            color: #1e5799;
+            margin-bottom: 5px;
+            font-size: 14px;
+        }
+        
+        .document-meta {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        
+        .document-preview {
+            font-size: 13px;
+            color: #333;
+            line-height: 1.4;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .content-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+        
+        .toolbar {
+            padding: 15px 20px;
+            background: #f8fafc;
+            border-bottom: 1px solid #e2e8f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .toolbar-button {
+            background: #0684ce;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+        
+        .toolbar-button:hover {
+            background: #1e5799;
+        }
+        
+        .toolbar-button.secondary {
+            background: #e2e8f0;
+            color: #333;
+        }
+        
+        .toolbar-button.secondary:hover {
+            background: #cbd5e0;
+        }
+        
+        .document-viewer {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: white;
+        }
+        
+        .document-content {
+            max-width: 800px;
+            line-height: 1.6;
+        }
+        
+        .document-content h1 {
+            color: #1e5799;
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+        }
+        
+        .document-content h2 {
+            color: #0684ce;
+            margin: 25px 0 15px 0;
+            font-size: 1.3rem;
+        }
+        
+        .document-content h3 {
+            color: #1e5799;
+            margin: 20px 0 10px 0;
+            font-size: 1.1rem;
+        }
+        
+        .document-content p {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .document-content ul, .document-content ol {
+            margin: 15px 0 15px 25px;
+            color: #333;
+        }
+        
+        .document-content li {
+            margin-bottom: 8px;
+        }
+        
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .empty-state h3 {
+            color: #1e5799;
+            margin-bottom: 10px;
+        }
+        
+        .loading-state {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+        
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid #e2e8f0;
+            border-radius: 50%;
+            border-top-color: #0684ce;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .sidebar {
+                width: 100%;
+                max-height: 50vh;
+            }
+            
+            .container {
+                margin: 10px;
+                border-radius: 15px;
+            }
+        }
+        
+        .document-url {
+            margin-top: 10px;
+            padding: 10px;
+            background: #f0f9ff;
+            border-radius: 6px;
+            border-left: 4px solid #0684ce;
+        }
+        
+        .document-url a {
+            color: #0684ce;
+            text-decoration: none;
+            font-size: 13px;
+        }
+        
+        .document-url a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📋 Policy Document Browser</h1>
+            <p>Search, browse, and review AmeriCU's loan origination and financial services policies</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="search-section">
+                    <input 
+                        type="text" 
+                        class="search-input" 
+                        id="searchInput" 
+                        placeholder="Search policy documents..."
+                        onkeyup="searchDocuments()"
+                    >
+                </div>
+                
+                <div class="filters">
+                    <div class="filter-group">
+                        <label class="filter-label">Category</label>
+                        <select class="filter-select" id="categoryFilter" onchange="filterDocuments()">
+                            <option value="">All Categories</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label class="filter-label">Document Type</label>
+                        <select class="filter-select" id="typeFilter" onchange="filterDocuments()">
+                            <option value="">All Types</option>
+                            <option value="policy">Policy</option>
+                            <option value="procedure">Procedure</option>
+                            <option value="guideline">Guideline</option>
+                            <option value="manual">Manual</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="document-list" id="documentList">
+                    <div class="loading-state">
+                        <div class="spinner"></div>
+                        Loading policy documents...
+                    </div>
+                </div>
+            </div>
+            
+            <div class="content-area">
+                <div class="toolbar">
+                    <button class="toolbar-button" onclick="askAboutDocument()" id="askButton" disabled>
+                        Ask AI Assistant
+                    </button>
+                    <button class="toolbar-button secondary" onclick="openDocument()" id="openButton" disabled>
+                        Open Original
+                    </button>
+                    <button class="toolbar-button secondary" onclick="printDocument()">
+                        Print
+                    </button>
+                </div>
+                
+                <div class="document-viewer" id="documentViewer">
+                    <div class="empty-state">
+                        <h3>Select a Policy Document</h3>
+                        <p>Choose a document from the list on the left to view its contents and details.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allDocuments = [];
+        let selectedDocument = null;
+        const SERVER_URL = 'http://localhost:8000';
+        
+        // Load policy documents on page load
+        window.addEventListener('load', loadPolicyDocuments);
+        
+        async function loadPolicyDocuments() {
+            try {
+                // This would normally fetch from the policy API endpoint
+                // For now, we'll simulate with some sample data
+                const sampleDocs = [
+                    {
+                        id: 'auto-loan-001',
+                        name: 'Auto Loan Origination Policy',
+                        category: 'Auto Loans',
+                        author: 'Lending Department',
+                        applicability_group: 'Loan Officers',
+                        preview: 'This policy outlines the procedures for originating auto loans, including credit requirements, documentation needed, and approval processes...',
+                        content: `# Auto Loan Origination Policy
+
+## Overview
+This policy establishes the guidelines and procedures for originating auto loans at AmeriCU Credit Union.
+
+## Credit Requirements
+- Minimum credit score: 620 for new vehicles, 580 for used vehicles
+- Debt-to-income ratio should not exceed 40%
+- Stable employment history of at least 2 years
+
+## Documentation Required
+1. Completed loan application
+2. Proof of income (pay stubs, tax returns)
+3. Vehicle information and title
+4. Insurance documentation
+5. Credit report and score
+
+## Approval Process
+1. Initial application review
+2. Credit verification
+3. Income verification
+4. Vehicle appraisal
+5. Final approval by loan committee
+
+## Loan Terms
+- New vehicles: Up to 84 months
+- Used vehicles: Up to 60 months
+- Interest rates based on credit tier and term`,
+                        urls: {
+                            direct: 'https://example.com/policies/auto-loan-001'
+                        }
+                    },
+                    {
+                        id: 'mortgage-002',
+                        name: 'Mortgage Underwriting Guidelines',
+                        category: 'Mortgages',
+                        author: 'Underwriting Department',
+                        applicability_group: 'Underwriters',
+                        preview: 'Comprehensive guidelines for mortgage underwriting including income verification, asset documentation, and risk assessment procedures...',
+                        content: `# Mortgage Underwriting Guidelines
+
+## Purpose
+These guidelines ensure consistent and compliant mortgage underwriting practices.
+
+## Income Verification
+- W-2 forms for past 2 years
+- Recent pay stubs (30 days)
+- Tax returns for self-employed borrowers
+- Verification of Employment (VOE)
+
+## Asset Documentation
+- Bank statements (2 months)
+- Investment account statements
+- Gift letter documentation if applicable
+- Retirement account statements
+
+## Credit Requirements
+- Minimum credit score: 640 for conventional loans
+- Credit history review for past 24 months
+- Explanation letters for derogatory credit
+
+## Debt-to-Income Ratios
+- Front-end ratio: Maximum 28%
+- Back-end ratio: Maximum 36%
+- Exceptions require senior underwriter approval`,
+                        urls: {
+                            direct: 'https://example.com/policies/mortgage-002'
+                        }
+                    },
+                    {
+                        id: 'compliance-003',
+                        name: 'TRID Compliance Procedures',
+                        category: 'Compliance',
+                        author: 'Compliance Department',
+                        applicability_group: 'All Loan Staff',
+                        preview: 'Procedures for compliance with TILA-RESPA Integrated Disclosure (TRID) regulations including timing requirements and documentation...',
+                        content: `# TRID Compliance Procedures
+
+## Overview
+The TILA-RESPA Integrated Disclosure (TRID) rule requires specific timing and documentation for mortgage loan disclosures.
+
+## Key Timing Requirements
+- Loan Estimate: Must be provided within 3 business days of application
+- Closing Disclosure: Must be provided 3 business days before closing
+- Changed circumstances may require revised disclosures
+
+## Required Disclosures
+1. Loan Estimate (LE)
+2. Closing Disclosure (CD)
+3. Special Information Booklet
+4. Home Loan Toolkit
+
+## Documentation Requirements
+- All disclosures must be documented in loan file
+- Borrower receipt acknowledgment required
+- Timing compliance must be verified
+
+## Staff Responsibilities
+- Loan officers: Ensure timely application taking
+- Processors: Prepare accurate disclosures
+- Underwriters: Review for compliance
+- Closers: Verify final disclosure accuracy`,
+                        urls: {
+                            direct: 'https://example.com/policies/compliance-003'
+                        }
+                    }
+                ];
+                
+                allDocuments = sampleDocs;
+                populateFilters();
+                displayDocuments(allDocuments);
+                
+            } catch (error) {
+                console.error('Error loading policy documents:', error);
+                document.getElementById('documentList').innerHTML = 
+                    '<div class="empty-state"><h3>Error Loading Documents</h3><p>Unable to load policy documents. Please try again later.</p></div>';
+            }
+        }
+        
+        function populateFilters() {
+            const categories = [...new Set(allDocuments.map(doc => doc.category))];
+            const categoryFilter = document.getElementById('categoryFilter');
+            
+            categories.forEach(category => {
+                const option = document.createElement('option');
+                option.value = category;
+                option.textContent = category;
+                categoryFilter.appendChild(option);
+            });
+        }
+        
+        function displayDocuments(documents) {
+            const documentList = document.getElementById('documentList');
+            
+            if (documents.length === 0) {
+                documentList.innerHTML = 
+                    '<div class="empty-state"><h3>No Documents Found</h3><p>Try adjusting your search or filter criteria.</p></div>';
+                return;
+            }
+            
+            documentList.innerHTML = documents.map(doc => `
+                <div class="document-item" onclick="selectDocument('${doc.id}')">
+                    <div class="document-title">${doc.name}</div>
+                    <div class="document-meta">
+                        ${doc.category} • ${doc.author} • ${doc.applicability_group}
+                    </div>
+                    <div class="document-preview">${doc.preview}</div>
+                </div>
+            `).join('');
+        }
+        
+        function selectDocument(docId) {
+            // Remove previous selection
+            document.querySelectorAll('.document-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            
+            // Find and select the clicked document
+            const docElement = event.target.closest('.document-item');
+            docElement.classList.add('selected');
+            
+            selectedDocument = allDocuments.find(doc => doc.id === docId);
+            displayDocumentContent(selectedDocument);
+            
+            // Enable toolbar buttons
+            document.getElementById('askButton').disabled = false;
+            document.getElementById('openButton').disabled = false;
+        }
+        
+        function displayDocumentContent(doc) {
+            const viewer = document.getElementById('documentViewer');
+            
+            let urlSection = '';
+            if (doc.urls && doc.urls.direct) {
+                urlSection = `
+                    <div class="document-url">
+                        <strong>Original Document:</strong> 
+                        <a href="${doc.urls.direct}" target="_blank">${doc.urls.direct}</a>
+                    </div>
+                `;
+            }
+            
+            viewer.innerHTML = `
+                <div class="document-content">
+                    <div style="border-bottom: 2px solid #e2e8f0; padding-bottom: 20px; margin-bottom: 20px;">
+                        <h1>${doc.name}</h1>
+                        <div style="color: #666; font-size: 14px;">
+                            <strong>Category:</strong> ${doc.category} | 
+                            <strong>Author:</strong> ${doc.author} | 
+                            <strong>Applies to:</strong> ${doc.applicability_group}
+                        </div>
+                        ${urlSection}
+                    </div>
+                    ${formatDocumentContent(doc.content)}
+                </div>
+            `;
+        }
+        
+        function formatDocumentContent(content) {
+            // Convert markdown-like content to HTML
+            return content
+                .replace(/^# (.*$)/gm, '<h1>$1</h1>')
+                .replace(/^## (.*$)/gm, '<h2>$1</h2>')
+                .replace(/^### (.*$)/gm, '<h3>$1</h3>')
+                .replace(/^\d+\. (.*$)/gm, '<li>$1</li>')
+                .replace(/^- (.*$)/gm, '<li>$1</li>')
+                .replace(/\n\n/g, '</p><p>')
+                .replace(/^(?!<[h|l])/gm, '<p>')
+                .replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>')
+                .replace(/<\/li>\s*<\/ul>\s*<ul>\s*<li>/g, '</li><li>');
+        }
+        
+        function searchDocuments() {
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            const categoryFilter = document.getElementById('categoryFilter').value;
+            const typeFilter = document.getElementById('typeFilter').value;
+            
+            let filteredDocs = allDocuments.filter(doc => {
+                const matchesSearch = searchTerm === '' || 
+                    doc.name.toLowerCase().includes(searchTerm) ||
+                    doc.preview.toLowerCase().includes(searchTerm) ||
+                    doc.category.toLowerCase().includes(searchTerm);
+                
+                const matchesCategory = categoryFilter === '' || doc.category === categoryFilter;
+                const matchesType = typeFilter === '' || doc.name.toLowerCase().includes(typeFilter);
+                
+                return matchesSearch && matchesCategory && matchesType;
+            });
+            
+            displayDocuments(filteredDocs);
+        }
+        
+        function filterDocuments() {
+            searchDocuments(); // Reuse the search logic
+        }
+        
+        function askAboutDocument() {
+            if (!selectedDocument) return;
+            
+            // Open the policy interface with a pre-filled question about this document
+            const question = `Tell me about the ${selectedDocument.name}`;
+            const url = `policy_interface.html?preload=${encodeURIComponent(question)}`;
+            window.open(url, '_blank');
+        }
+        
+        function openDocument() {
+            if (!selectedDocument || !selectedDocument.urls || !selectedDocument.urls.direct) return;
+            window.open(selectedDocument.urls.direct, '_blank');
+        }
+        
+        function printDocument() {
+            window.print();
+        }
+    </script>
+</body>
+</html>
